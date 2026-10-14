@@ -75,10 +75,10 @@
       ["Kategori/klinik yetki (kişi)","—","Fiilî kaydı olmayan kişiyi bir kategoriye yazmak için; yetkilendiren adı zorunlu"]])}
 
     <h2>3. Özel vardiyalar ve oryantasyon</h2>
-    <p>Excel'de saat notuyla yazılmış görevler için FMS, gün türüne göre kullanıcı tarafından girilir; değerler kaydedilir ve sonraki aylarda tekrar sorulmaz. Boş değer o kaydı “veri eksik” bırakır. İstisnalar (yetkili kuralı, bölüm 1): gündüz mesaisinin Cumartesi/Pazar/resmî tatil değeri sabittir (sorulmaz); gece görevi tek başına sayılmaz.</p>
+    <p>Excel'de saat notuyla yazılmış görevler için FMS, gün türüne göre kullanıcı tarafından girilir; değerler kaydedilir ve sonraki aylarda tekrar sorulmaz. Adım 3 tablosunda yalnız o ay gerçekten kaydı olan gün türü sorulur (diğer hücreler “bu ay gerekmiyor”). Boş değer o kaydı “veri eksik” bırakır. İstisnalar (yetkili kuralı, bölüm 1): gündüz mesaisinin Cumartesi/Pazar/resmî tatil değeri sabittir (sorulmaz); gece görevi tek başına sayılmaz.</p>
     ${table(["Gün türü","Açıklama"],Object.entries(DAYKEY).map(([k,v])=>[`<code>${k}</code>`,esc(v)]))}
     <p><b>İki yerde saatli nöbet:</b> aynı kişi <b>Cumartesi ya da Pazar</b> en az iki farklı Acil ailesi bölümünde saatli görev yaptıysa (ör. Acil 17.00–08.00 + Yenidoğan 09.00–17.00) ve o gün saatsiz kaydı yoksa o gün <b>tek tam nöbet</b> sayılır: kategori <b>Acil</b>, FMS günün standart değeri (tatilse onaylı değeri); özel vardiya FMS'i sorulmaz. Hafta içi (resmî tatil dahil) ya da Servis karışan iki yer günü birleştirilmez: uyarı verir ve kayıt düzeltilene (ya da FMS elle girilene) kadar sayılmaz. Elle FMS verilmiş, oryantasyon ya da bölümü belirsiz kayıt içeren gün birleştirilmez.</p>
-    <p>Oryantasyon nöbeti: “standart nöbet gibi say” ya da “FMS yok”; seçilmezse onay bekler. Oryantasyon kaydı kategori yetkisi doğurmaz.</p>
+    <p>Oryantasyon nöbeti <b>her zaman gerçek nöbet</b> gibi sayılır: günün standart FMS'i (kullanıcı kararı 14.10.2026; ayar yok). Oryantasyon kaydı kategori yetkisi doğurmaz.</p>
 
     <h2>4. Ay sınırı</h2>
     <ul><li>Geçen ayın son <b>3</b> gününün RESMÎ nöbetleri bu ayın ilk günleri için engeldir (fiilî liste değil).</li>
@@ -99,7 +99,7 @@
 
     <h2>6. Aydan aya taşıma (${esc(d.carry.sheet)} sayfası)</h2>
     <p>Program kalıcı veri tutmaz. Gelecek ayın ihtiyaç duyduğu bilgi, “Excel indir” ile alınan dosyanın <b>${esc(d.carry.sheet)}</b> sayfasında taşınır (biçim <code>${esc(d.carry.format)}</code>, sürüm ${num(d.carry.v)}; JSON parçaları + SHA-256). Gelecek ay Adım 1 → ② bölümünde bu dosya yüklenir.</p>
-    <ul><li>Taşınanlar: ayın resmî çizelgesi (sonraki ayın ay başı kontrolü için), onaylı isim eşleştirmeleri ve “farklı kişi” kararları, özel vardiya FMS değerleri ve oryantasyon kuralı, ay sonunu aşan izinler ve müsait olmama kayıtları, başlama/ayrılış ve klinik yetkiler, devir defterinin açık kayıtları, kurallar (öneri olarak; yeniden onay ister).</li>
+    <ul><li>Taşınanlar: ayın resmî çizelgesi (sonraki ayın ay başı kontrolü için), onaylı isim eşleştirmeleri ve “farklı kişi” kararları, özel vardiya FMS değerleri, ay sonunu aşan izinler ve müsait olmama kayıtları, başlama/ayrılış ve klinik yetkiler, devir defterinin açık kayıtları, kurallar (öneri olarak; yeniden onay ister).</li>
     <li>Taşınmayanlar: kimlik/sicil numaraları, hariç tutma (yalnız o ay), ödeme durumu, orijinal Excel dosyası.</li>
     <li>Yalnız bir önceki aya ait dosya kabul edilir. Sayfa değiştirilmişse (SHA-256 tutmuyorsa) içe alınmaz.</li>
     <li>Bu ay boş olan değerler doldurulur; kullanıcının bu ay girdiği değerler ezilmez (fark varsa bildirilir). Aynı dosyayı ikinci kez yüklemek kayıtları çoğaltmaz.</li></ul>
@@ -166,7 +166,7 @@
       ["Güvenli mod",s.safeBoundary?"açık":"kapalı"],["Hakediş modu",s.mode==="defer"?"onaylı devir":"devirsiz"],
       ["Hariç tutulan kişi",String((M.exclusions||[]).length)],["İzin / müsait olmama kaydı",`${(M.leaves||[]).length} / ${(M.unavailable||[]).length}`],
       ["Özel vardiya kuralları",(g.specialShiftRules||[]).map(r=>`${esc(r.start)}–${esc(r.end)}: ${Object.entries(r.fms||{}).map(([k,v])=>`${esc(DAYKEY[k]||k)} ${num(v)}`).join(", ")}`).join("<br>")||"—"],
-      ["Oryantasyon kuralı",g.orientationRule==="standard"?"standart nöbet gibi":g.orientationRule==="zero"?"FMS yok":"seçilmedi"],
+      ["Oryantasyon nöbeti","gerçek nöbet (sabit kural)"],
       ["FMS tablosu (Pzt…Paz)",[1,2,3,4,5,6,0].map(i=>num((g.fmsTable||{})[i])).join(" / ")],["Arefe nöbeti (hafta içi) / gündüz mesaisi (Cts/Paz/tatil)",`${num(rule(g,"halfday"))} / ${num(rule(g,"daytime"))}`],["Katsayılar",Object.entries(g.factors||{}).map(([c,f])=>`${esc(c)} ×${num(f)}`).join(", ")]])}`;
   }
   function documentHtml(d,live){return`<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Talimatname — Pediatri Nöbet Dengeleyici ${esc(d&&d.version)}</title><style>${BODY_CSS}${CSS}</style></head><body>${render(d,live)}</body></html>`;}

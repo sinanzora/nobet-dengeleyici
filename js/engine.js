@@ -199,7 +199,8 @@
       r.fms=null;r.fmsSource="";r.duty=true;r.problems=[];
       const holiday=(M.settings.holidays||[]).find(h=>h.date===r.date);
       if(r.fmsOverride!=null&&r.fmsOverride!==""){r.fms=C.num(r.fmsOverride);r.fmsSource="elle düzeltildi";}
-      else if(r.orientation){const rule=db.global.orientationRule;if(rule==="standard"){r.fms=stdFms(db,M,r.date);r.fmsSource="oryantasyon = standart nöbet (kural)";}else if(rule==="zero"){r.fms=0;r.duty=false;r.fmsSource="oryantasyon = FMS yok (kural)";}else{r.problems.push("Oryantasyon nöbetinin FMS kuralı onaylanmadı");}}
+      /* kullanıcı kararı (14.10.2026): oryantasyon nöbeti HER ZAMAN gerçek nöbet gibi sayılır (günün standart FMS'i); eski “FMS yok / seçilmedi” ayarı yok sayılır */
+      else if(r.orientation){const v=stdFms(db,M,r.date);if(v==null)r.problems.push(dayFmsProblem(holiday));else{r.fms=v;r.fmsSource="oryantasyon = gerçek nöbet (kural)";}}
       else if(C.isNightShift(r.shift)){
         /* yetkili (14.10.2026): tek başına gece görevi olmaz — gece ancak hafta sonu iki yerde çalışmanın parçasıdır (aşağıda birleşir) */
         r.problems.push(`Tek başına gece görevi (${r.shift.start}–${r.shift.end}): yetkiliye göre böyle görev olmaz; gece yalnız hafta sonu iki yerde çalışmanın parçası olur. Aynı günün öbür satırı eksik ya da yanlış yazılmış olabilir — kaydı düzeltin (doğruysa FMS'i elle girin)`);}
@@ -208,7 +209,7 @@
         const v=C.tableFms(db.global.fmsTable,"daytime");if(v==null)r.problems.push("Gündüz mesaisi FMS değeri tabloda boş");else{r.fms=v;r.fmsSource=`gündüz mesaisi ${r.shift.start}-${r.shift.end} (${C.dayName(r.date)}${holiday?", resmî tatil":""}) — kural`;}}
       else if(r.shift&&!(r.shift.start==="08:00"&&r.shift.end==="08:00")){
         const rule=db.global.specialShiftRules.find(x=>x.start===r.shift.start&&x.end===r.shift.end);
-        const dt=dayTypeOf(r.date,M);const v=rule?C.num(rule.fms[dt]):null;
+        const dt=dayTypeOf(r.date,M);const v=rule?C.num(rule.fms[dt]):null;r.ruleDt=dt;/* Adım 3 tablosu: bu ay hangi gün türünün değeri gerçekten gerekiyor */
         if(v==null)r.problems.push(`${r.shift.start}-${r.shift.end} özel vardiyasının ${({weekday:"hafta içi",friday:"cuma",saturday:"cumartesi",sunday:"pazar",holiday:"resmî tatil",halfday:"yarım gün"})[dt]} FMS değeri onaylanmadı`);else{r.fms=v;r.fmsSource=`özel vardiya kuralı ${r.shift.start}-${r.shift.end}`;}
       }
       else{const v=stdFms(db,M,r.date);if(v==null)r.problems.push(dayFmsProblem(holiday));else{r.fms=v;r.fmsSource=holiday?(holiday.kind===HALF?halfSource(r.date):"resmî tatil (onaylı)"):"standart tablo";}}

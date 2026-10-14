@@ -48,7 +48,7 @@
       else if(sp===true)fms=fmsOfDate(db,M,r.date);
       else if(sp===false)fms=0;
       else if(r.fmsOverride!=null&&r.fmsOverride!=="")fms=C.num(r.fmsOverride);
-      else if(r.orientation){const rule=db.global.orientationRule;if(rule==="standard")fms=fmsOfDate(db,M,r.date);else if(rule==="zero"){fms=0;duty=false;}}
+      else if(r.orientation)fms=fmsOfDate(db,M,r.date);/* kullanıcı kararı 14.10.2026: oryantasyon her zaman gerçek nöbet */
       else if(!isFull){const kind=shiftKind(r.shift);
         if(kind==="night")fms=null;
         else if(kind==="day"&&offDay(r.date))fms=tab(db,"daytime");
