@@ -505,6 +505,8 @@
     M.manualEdits.push({...edit,at:new Date().toISOString()});
     reaudit(db,month);log(M,"ELLE_DUZELTME",JSON.stringify(edit));return r;
   }
+  /* Son hesaplamadan SONRA resmî listede elle yapılan değişiklikler (yeniden hesaplama bunları siler — kullanıcı isteği 15.10.2026: önce sorulsun) */
+  function pendingManualEdits(M){const r=M&&M.result;if(!r||!(r.assignments||[]).length)return[];const g=String(r.generatedAt||"");return(M.manualEdits||[]).filter(e=>String(e.at||"")>g);}
   function reaudit(db,month){
     const M=db.months[month];const r=M.result;if(!r||!r.assignments)return r;
     const built=buildProblem(db,M);const pre=preflight(db,M,built.staff,built.bnd);
@@ -779,7 +781,7 @@
   }
 
   return{DB_VERSION,defaultGlobal,newDb,newMonth,ensureMonth,log,resolve,ensurePerson,personName,confirmAlias,rejectAlias,isRejected,aliasSuggestions,
-    setActualImport,confirmActualImport,setProbel,probelSignature,actualRows,staffSummary,priorStatus,boundaryBlocks,personBlocks,dailyLimits,preflight,buildProblem,run,manualEdit,reaudit,
+    setActualImport,confirmActualImport,setProbel,probelSignature,actualRows,staffSummary,priorStatus,boundaryBlocks,personBlocks,dailyLimits,preflight,buildProblem,run,manualEdit,pendingManualEdits,reaudit,
     ledgerBalances,openBalance,addLedger,reconcile,postedOfficial,officialForMonth,pullPriorFromPrevious,priorSignature,inputSignature,monthInputSignature,checkStale,carryToNext,carryForwardBasics,nextMonthFirstDuties,stdFms,dayTypeOf,
     newStarterInfo,newStarterFlags,postedDiff,staffingNotes,overBound,INPUT_SIG_V,PRIOR_MANUAL_LABEL,inMonthDate,misplacedActual,recordListModel,LEGACY_ORIGINS,dropLegacyPrior,dropLegacyCurrent,validateDb,validateCarry,priorDayCounts,repairDb,okDate,MONTH_RE,
     CARRY_FORMAT,CARRY_V,nextLedgerEntries,carryPayload,applyCarryPayload,setSpecialDayAnswer,addSpecialDay,priorHolidayInfo,setPriorHolidays,HALF,LEAVE_REASONS,migrateV3};

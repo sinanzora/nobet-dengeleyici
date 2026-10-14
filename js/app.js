@@ -302,7 +302,13 @@
     notify(`${result.records.length} fiilî kayıt okundu (${result.stats.daysFound}/${result.stats.days} gün, ${result.stats.unitsFound}/5 bölüm). Önizlemeyi kontrol edip “İçe aktarmayı onayla”ya basın.`);
   }
   /* ---------------- çözüm ve dışa aktarma ---------------- */
-  function run(){if(busy)return;busy=true;const b=$('[data-action="run"]');const old=b.textContent;b.textContent="Hesaplanıyor…";b.disabled=true;
+  /* 3.2.2 (kullanıcı isteği 15.10.2026): resmî listede elle yapılmış değişiklik varken yeniden hesaplama onları uyarısız silmesin */
+  async function run(){if(busy)return;
+    const pend=E.pendingManualEdits(M());
+    if(pend.length){const add=pend.filter(e=>e.type==="add").length,rem=pend.filter(e=>e.type==="remove").length;
+      const v=await dialog("Elle yaptığınız değişiklikler kaybolacak",`<p>Resmî listede son hesaplamadan sonra elle yaptığınız <b>${pend.length} değişiklik</b> var (${add} ekleme, ${rem} çıkarma).</p><p><b>Yeniden hesaplarsanız</b> liste baştan dizilir ve bu değişiklikler <b>kaybolur</b>.</p><p>Elle düzenlediğiniz listeyi kullanacaksanız <b>Vazgeç</b>'e basıp doğrudan Excel'i indirin; program her elle değişikliği zaten denetledi.</p>`,{ok:"Yine de yeniden hesapla",cancel:"Vazgeç"});
+      if(!v)return;}
+    busy=true;const b=$('[data-action="run"]');const old=b.textContent;b.textContent="Hesaplanıyor…";b.disabled=true;
     setTimeout(()=>{try{const r=E.run(db,db.activeMonth);save("COZUM",r.status);tab="roster";showStep(4);notify(r.status==="valid_complete"?"Çizelge geçerli; bağımsız denetimden geçti.":r.status==="valid_incomplete"?"Çizelge kurallara uygun; ancak eksik veri var (uyarılara bakın).":r.statusText,r.status!=="valid_complete"&&r.status!=="valid_incomplete");}catch(e){console.error(e);notify("Hesaplama hatası: "+e.message,true,15000);}finally{busy=false;b.textContent=old;b.disabled=false;}},30);}
   async function exportExcel(){
     const m=M();const r=m.result;if(!r)return;const mode=$("#exportMode").value;
