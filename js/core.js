@@ -2,7 +2,7 @@
    Tüm tarih hesapları YYYY-AA-GG metinleri ve UTC üzerinden yapılır; yerel saat dilimi kayması olmaz. */
 (function(root,factory){const api=factory();if(typeof module==="object"&&module.exports)module.exports=api;root.NobetCore=api;})(typeof globalThis!=="undefined"?globalThis:this,function(){
   "use strict";
-  const VERSION="3.2.0";
+  const VERSION="3.2.1";
   const UNITS=["Servis","Acil","Yoğun Bakım","Yenidoğan","Kıdemli"];
   const CATEGORY_OF_UNIT={"Servis":"Servis","Acil":"Acil","Yoğun Bakım":"Acil","Yenidoğan":"Acil","Kıdemli":"Acil"};
   const MONTHS_TR=["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];

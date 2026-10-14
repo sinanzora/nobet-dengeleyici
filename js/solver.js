@@ -16,7 +16,7 @@
      posted: bu ayın PROBEL'e işlenmiş nöbetini koruma ödülü (yalnız bu ayın PROBEL listesi yüklüyse ve “koru” seçiliyse; yumuşak tercih, kesin kural değil). */
   const DEFAULT_WEIGHTS=Object.freeze({over:10,short:60,day:1,actual:4,weekend:0.4,avoid:25,prefer:4,balanceServis:3,balanceAcil:0.5,hard:40,switch:0.5,posted:6});
   /* kategori iyileştirme turunun sınırları: en çok bu kadar tur ve süre (ms; ayrıca çözücü süre sınırını aşmaz) */
-  const IMPROVE=Object.freeze({rounds:8,ms:4000});
+  const IMPROVE=Object.freeze({rounds:40,ms:8000,maxCombo:10,maxHelpers:12});
   /* kategori kapsama kanıtının arama sınırları; aşılırsa kanıt iddia edilmez */
   const COVERAGE=Object.freeze({ms:2000,nodes:3e6,maxCandidates:20});
   function gcd(a,b){a=Math.abs(a);b=Math.abs(b);while(b){[a,b]=[b,a%b];}return a;}
@@ -212,22 +212,39 @@
     for(const p of problem.persons){if(!(p.target>0)||!p.cats.length)continue;const by={};for(const c of p.cats)by[c]=overFloor(values[c],p.blockedArr,p.target,opt);const fin=Object.values(by).filter(v=>v!=null);per[p.pid]=by;if(fin.length)lb+=Math.min(...fin);}
     return{lb:r2(lb),per};
   }
-  /* KATEGORİ İYİLEŞTİRME: karma (iki kategoride de çalışmış) bir kişinin diğer kategorideki kaçınılmaz fazlası şimdikinden küçükse,
-     o kişi o kategoriye sabitlenip yeniden çözülür; yalnız geçerli ve toplam fazlası KESİN azalan sonuç kabul edilir (açgözlü, belirlenimci sıra). */
+  /* KATEGORİ İYİLEŞTİRME (3.2.1 — kullanıcı isteği 14.10.2026: “tüm olası varyasyonlar denenmeli”). Karma (iki kategoride de çalışmış) kişiler için:
+     (1) TEKLİ değişiklik: fazlası öbür kategoride azalabilecek kişi (kazançlı aday);
+     (2) KOMBİNASYONLAR: kazançlı adayların tüm alt kümeleri ve kazançlı aday + “yardımcı” kaydırmalar — kendi fazlası azalmayan ama öbür
+         kategoriye geçerek yer açan kişi (Servis'teki biri Acil'e, Acil'deki biri Servis'e; kullanıcının örneği). Olası kazancı büyük olan,
+         ters yönde takas içeren ve küçük kümeler önce denenir; denenen kümenin dışındaki karma kişiler o anki kategorilerinde sabit tutulur.
+     Her KABULDEN sonra adaylar yeniden hesaplanıp baştan denenir (Eylül 2026 gerçek verisi: tek başına reddedilen bir aday, başka bir kabulden sonra 36 → 32 ederdi).
+     Kişi bazlı alt sınıra ulaşılınca durulur (daha iyisi imkânsız). Yalnız geçerli ve amacı KESİN düşüren sonuç kabul edilir; süre bütçesi
+     biterse en iyi bulunan döner. Sıra belirlenimci. */
   function improveCategories(problem,first,lbInfo,t0){
     let r=first,P=problem;const tried=[],accepted=[];const budget=Math.min(IMPROVE.ms,problem.timeLimitMs??6000);
-    for(let round=0;round<IMPROVE.rounds;round++){
-      if(now()-t0>budget)break;
-      const pp=new Map((r.perPerson||[]).map(x=>[x.pid,x]));const cands=[];
+    const overOf=x=>r2((x.perPerson||[]).reduce((z,y)=>z+(y.over||0),0));const atLB=()=>overOf(r)<=lbInfo.lb+1e-9;const late=()=>now()-t0>budget;
+    const byPid=(a,b)=>a.p.pid<b.p.pid?-1:a.p.pid>b.p.pid?1:0;
+    const cands=()=>{const pp=new Map((r.perPerson||[]).map(x=>[x.pid,x]));const gain=[],help=[];
       for(const p of P.persons){if(!(p.target>0)||p.cats.length<2)continue;const cur=pp.get(p.pid);if(!cur||!cur.category)continue;
-        for(const c of p.cats){if(c===cur.category)continue;const f=lbInfo.per[p.pid]?.[c];if(f!=null&&f+1e-9<cur.over)cands.push({p,c,gain:cur.over-f});}}
-      cands.sort((a,b)=>b.gain-a.gain||(a.p.pid<b.p.pid?-1:a.p.pid>b.p.pid?1:0));
+        for(const c of p.cats){if(c===cur.category)continue;const f=lbInfo.per[p.pid]?.[c];if(f==null)continue;
+          if(f+1e-9<cur.over)gain.push({p,c,gain:cur.over-f});else help.push({p,c,gain:0});}}
+      gain.sort((a,b)=>b.gain-a.gain||byPid(a,b));help.sort(byPid);return{gain,help};};
+    const attempt=set=>{tried.push(set.map(x=>x.p.pid+">"+x.c).join("+"));const left=Math.max(500,budget-(now()-t0));
+      const cur=new Map((r.perPerson||[]).map(x=>[x.pid,x.category]));const pins=new Map(set.map(x=>[x.p.pid,x.c]));
+      const P2={...P,coverageProof:false,timeLimitMs:Math.min(P.timeLimitMs??6000,left),persons:P.persons.map(q=>pins.has(q.pid)?{...q,cats:[pins.get(q.pid)]}:set.length>1&&q.cats.length>1&&cur.get(q.pid)?{...q,cats:[cur.get(q.pid)]}:q)};
+      const s=solveOnce(P2);
+      if(s.status==="feasible"&&s.stats.objective<r.stats.objective-1e-9){for(const x of set)accepted.push({pid:x.p.pid,name:x.p.name,category:x.c,objectiveBefore:r.stats.objective,objectiveAfter:s.stats.objective});r=s;P=P2;return true;}
+      return false;};
+    for(let round=0;round<IMPROVE.rounds&&!atLB()&&!late();round++){
+      const{gain,help}=cands();const G=gain.slice(0,IMPROVE.maxCombo),H=help.slice(0,IMPROVE.maxHelpers);const combos=[];
+      for(let m=1;m<(1<<G.length);m++){const s=G.filter((_,i)=>(m>>i)&1);if(s.length>1)combos.push(s);}
+      for(const g of G){for(const h of H)combos.push([g,h]);for(let i=0;i<H.length;i++)for(let j=i+1;j<H.length;j++)combos.push([g,H[i],H[j]]);}
+      for(let i=0;i<G.length;i++)for(let k=i+1;k<G.length;k++)for(const h of H)combos.push([G[i],G[k],h]);
+      const sc=s=>s.reduce((z,x)=>z+x.gain,0);const opp=s=>s.every(x=>x.gain>0||s.some(y=>y.gain>0&&y.c!==x.c))?1:0;
+      combos.sort((a,b)=>sc(b)-sc(a)||opp(b)-opp(a)||a.length-b.length);
       let improved=false;
-      for(const x of cands){if(now()-t0>budget)break;const key=x.p.pid+">"+x.c;if(tried.includes(key))continue;tried.push(key);
-        const left=Math.max(500,budget-(now()-t0));
-        const P2={...P,coverageProof:false,timeLimitMs:Math.min(P.timeLimitMs??6000,left),persons:P.persons.map(q=>q.pid===x.p.pid?{...q,cats:[x.c]}:q)};
-        const s=solveOnce(P2);
-        if(s.status==="feasible"&&s.stats.objective<r.stats.objective-1e-9){accepted.push({pid:x.p.pid,name:x.p.name,category:x.c,objectiveBefore:r.stats.objective,objectiveAfter:s.stats.objective});r=s;P=P2;improved=true;break;}}
+      for(const x of G){if(late())break;if(attempt([x])){improved=true;break;}}
+      if(!improved)for(const s of combos){if(late())break;if(attempt(s)){improved=true;break;}}
       if(!improved)break;
     }
     return{r,tried,accepted,problem:P};
