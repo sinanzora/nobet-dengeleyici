@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#123d3a">
+  <title>Pediatri Nöbet Dengeleyici</title>
+  <meta name="description" content="Hastanenin aylık fiilî nöbet Excel'ini okuyup kurallara uygun resmî (PROBEL'e girilecek) çizelge, FMS ve Servis-eşdeğeri hakediş mutabakatı üretir. Veriler cihazdan çıkmaz ve kalıcı saklanmaz.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">ND</div>
+      <div><strong>Pediatri Nöbet Dengeleyici</strong><span>Fiilî · Resmî (PROBEL) · FMS · Hakediş — v<span id="appVersion"></span></span></div>
+    </div>
+    <div class="month-control">
+      <label for="monthPick">Çalışılan ay</label>
+      <input id="monthPick" type="month">
+      <button class="ghost" id="openMonthBtn" type="button">Ayı aç</button>
+      <div class="menu">
+        <button class="ghost" id="dataMenuBtn" type="button" aria-haspopup="true">Veri ▾</button>
+        <div class="menu-list" id="dataMenu" hidden>
+          <button type="button" data-action="backup">Çalışmayı dosyaya kaydet (.json)</button>
+          <button type="button" data-action="restore">Kaydedilmiş çalışmadan devam et…</button>
+          <button type="button" data-action="help">Kısa kullanım kılavuzu</button>
+          <button type="button" data-action="talimat">Talimatname (tüm parametreler)…</button>
+          <button type="button" data-action="reset-month" class="danger-text">Bu ayın verilerini sıfırla…</button>
+          <button type="button" data-action="finish" class="danger-text">Bitir ve temizle…</button>
+        </div>
+      </div>
+      <input id="restoreInput" type="file" accept="application/json,.json" hidden>
+      <input id="carryInput" type="file" accept=".xlsx" hidden>
+    </div>
+  </header>
+
+  <main>
+    <nav class="steps" aria-label="Adımlar">
+      <button class="step active" data-step="1" type="button"><b>1</b><span><strong>Dosyalar</strong><small>Hastane Excel'i + geçen ay</small></span><i class="dot" id="dot1"></i></button>
+      <button class="step" data-step="2" type="button"><b>2</b><span><strong>Kişiler ve izinler</strong><small>Hariç, izin, kategori, hakediş</small></span><i class="dot" id="dot2"></i></button>
+      <button class="step" data-step="3" type="button"><b>3</b><span><strong>Kurallar</strong><small>Kadro sınırları, FMS, tatil</small></span><i class="dot" id="dot3"></i></button>
+      <button class="step" data-step="4" type="button"><b>4</b><span><strong>Çizelge ve Excel</strong><small>Oluştur, karşılaştır, indir</small></span><i class="dot" id="dot4"></i></button>
+      <div class="autosave"><span class="pulse"></span><span id="saveState">Bu sekmede geçici · sekme kapanınca silinir</span></div>
+      <div class="side-note" id="sideNote"></div>
+    </nav>
+
+    <section class="workspace">
+      <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
+      <div id="staleBanner" class="banner bad hidden"></div>
+
+      <!-- ADIM 1 -->
+      <article class="panel step-panel active" data-panel="1">
+        <div class="panel-head"><div><p class="eyebrow">Adım 1</p><h1>Dosyaları yükleyin</h1><p>Hastanenin aylık nöbet Excel'ini <b>olduğu gibi</b> yükleyin; yeni şablon doldurmanız gerekmez. Dosya hiçbir yere gönderilmez; yalnız bu tarayıcıda işlenir.</p></div><span class="privacy">İnternet gerekmez</span></div>
+
+        <section class="card" id="cardActual">
+          <div class="card-head"><div><h2>① Bu ayın fiilî nöbet listesi <span class="req">gerekli</span></h2><p>Hastanenin yatay tablosu: tarih satırları + SERVİS / ACİL / YOĞUN BAKIM / YENİDOĞAN / KIDEMLİ sütunları.</p></div><div id="actualStatus" class="pill neutral">Yüklenmedi</div></div>
+          <div class="upload-zone" data-drop="actual">
+            <div class="upload-icon">⇪</div>
+            <div><strong>Excel dosyasını buraya bırakın</strong><p>.xlsx (önerilir), .xls veya .csv — tüm sayfalar taranır, nöbet tablosu otomatik bulunur.</p></div>
+            <button class="primary" type="button" data-action="pick-actual">Dosya seç</button>
+            <input type="file" id="actualInput" accept=".xlsx,.xlsm,.xls,.csv,.ods" hidden>
+          </div>
+          <div id="actualReport"></div>
+        </section>
+
+        <section class="card" id="cardPrior">
+          <div class="card-head"><div><h2>② Geçen ayın son 3 günündeki resmî nöbetler <span class="req">gerekli</span></h2><p>Ay başında nöbetler arası dinlenme kuralı geçen ayın son 3 günündeki <b>resmî</b> nöbetlere göre kontrol edilir. İki yol var: geçen ayın program çıktısı Excel'i ya da elle giriş.</p></div><div id="priorStatus" class="pill neutral">Eksik</div></div>
+          <div id="priorExtra"></div>
+        </section>
+
+        <div class="footer-actions"><span></span><button class="primary" type="button" data-goto="2">Kişiler adımına geç →</button></div>
+      </article>
+
+      <!-- ADIM 2 -->
+      <article class="panel step-panel" data-panel="2">
+        <div class="panel-head"><div><p class="eyebrow">Adım 2</p><h1>Bu ay kimler, hangi kategoride?</h1><p>Kategori, kişinin bu ayki fiilî görevlerinden çıkarılır: yalnız Servis çalışan yalnız Servis'e, yalnız Acil ailesinde çalışan yalnız Acil'e yazılır; ikisini yapan için biri seçilir.</p></div></div>
+        <div id="aliasPanel"></div>
+        <div id="presetPanel"></div>
+        <div class="toolbar"><input id="staffFilter" type="search" placeholder="Personel ara…"><span id="staffCount" class="muted"></span></div>
+        <div class="table-wrap"><table class="staff-table" id="staffTable"></table></div>
+        <section class="card">
+          <div class="card-head"><div><h2>İzinler (personelin çalışmadığı günler)</h2><p>Personelin <b>çalışmadığı her gün izin olarak girilir</b>: yıllık izin, rapor, doğum sonrası izni, mazeret, görevlendirme, <b>işten ayrılış</b> (ayrıldığı günden ay sonuna) ve <b>henüz işe başlamamış olma</b> (ay başından başladığı güne kadar). Hepsi aynı şekilde işlenir: o günlerde resmî nöbet yazılmaz. Ay sınırını aşan izin sonraki aya taşınır. “Nöbet istemiyor / istiyor” izin değildir, tercihtir.</p></div></div>
+          <div class="editor-grid" id="leaveEditor"></div>
+          <div id="leaveList"></div>
+        </section>
+        <div class="footer-actions"><button class="ghost" type="button" data-goto="1">← Geri</button><button class="primary" type="button" data-goto="3">Kurallar adımına geç →</button></div>
+      </article>
+
+      <!-- ADIM 3 -->
+      <article class="panel step-panel" data-panel="3">
+        <div class="panel-head"><div><p class="eyebrow">Adım 3</p><h1>Bu ayın kuralları</h1><p>Sabit kurallar her ay uygulanır: kişi başı en çok <b>8 farklı resmî nöbet günü</b>, nöbetler arasında <b>en az 2 tam boş gün</b>, <b>tek kategori</b>. Aşağıdakileri yetkili kişiyle kontrol edip onaylayın.</p></div></div>
+        <div id="rulesBody"></div>
+        <div class="footer-actions"><button class="ghost" type="button" data-goto="2">← Geri</button><button class="primary" type="button" data-goto="4">Çizelge adımına geç →</button></div>
+      </article>
+
+      <!-- ADIM 4 -->
+      <article class="panel step-panel" data-panel="4">
+        <div class="result-hero"><div><p class="eyebrow">Adım 4</p><h1>Resmî çizelge önerisi ve mutabakat</h1><p id="resultIntro">Henüz oluşturulmadı.</p></div><div id="statusBadge" class="status neutral">Bekliyor</div></div>
+        <div class="result-actions">
+          <button class="primary" type="button" data-action="run">Çizelgeyi oluştur / yeniden hesapla</button>
+          <span class="sep"></span>
+          <select id="exportMode" title="Excel çıktı biçimi"><option value="clone">Orijinal dosya + biçimi korunmuş “RESMİ ÖNERİ” sayfası</option><option value="inplace">Orijinal dosyanın kopyası, tablo hücreleri resmî çizelgeyle güncellenmiş</option></select>
+          <button class="soft" type="button" data-action="export" disabled>Excel indir</button>
+          <button class="soft" type="button" data-action="export-probel" disabled>PROBEL giriş listesi</button>
+          <button class="soft" type="button" data-action="print" disabled>Yazdır</button>
+          <button class="soft" type="button" data-action="carry" disabled>Sonraki aya devret</button>
+          <button class="ghost danger-text" type="button" data-action="finish">Bitir ve temizle</button>
+        </div>
+        <div id="resultMetrics" class="metric-grid"></div>
+        <div id="issues"></div>
+        <div class="subtabs" role="tablist">
+          <button class="active" data-tab="roster" type="button">Resmî çizelge</button>
+          <button data-tab="people" type="button">Kişi hakediş</button>
+          <button data-tab="compare" type="button">Fiilî ↔ resmî</button>
+          <button data-tab="daily" type="button">Günlük kadro</button>
+          <button data-tab="boundary" type="button">Ay sınırı</button>
+          <button data-tab="ledger" type="button">Devir defteri</button>
+          <button data-tab="log" type="button">İşlem günlüğü</button>
+        </div>
+        <div id="resultBody" class="table-wrap"></div>
+        <div class="footer-actions"><button class="ghost" type="button" data-goto="3">← Kurallara dön</button><span></span></div>
+      </article>
+    </section>
+  </main>
+
+  <dialog id="dlg"><form method="dialog" id="dlgForm"><div class="dialog-head"><h2 id="dlgTitle"></h2><button value="cancel" class="icon-btn" aria-label="Kapat" formnovalidate>×</button></div><div id="dlgBody" class="dialog-body"></div><div class="dialog-actions"><button value="cancel" class="ghost" id="dlgCancel" formnovalidate>Vazgeç</button><button value="ok" class="primary" id="dlgOk">Tamam</button></div></form></dialog>
+
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/import-actual.js"></script>
+  <script src="js/solver.js"></script>
+  <script src="js/auditor.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/xlsx-preserve.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/talimatname_veri.js"></script>
+  <script src="js/talimatname.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
