@@ -137,3 +137,8 @@ dialog::backdrop{background:rgba(18,61,58,.35)}
 /* telefon: iOS Safari 16 px altı yazılı kutuya dokununca sayfayı yakınlaştırır; dokunma hedefleri parmakla basılabilir boyda */
 @media (max-width:760px),(pointer:coarse){input,select,textarea,input[type=date],.staff-table select,.staff-table input[type=date]{font-size:16px!important}input[type=checkbox],input[type=radio]{width:20px;height:20px}.icon-btn{min-width:36px;min-height:36px;font-size:22px}#exportReminder{padding:8px 12px;font-size:13px;line-height:1.35;margin-bottom:10px}.mini{min-height:34px;padding:6px 10px}}
 @media print{body>*:not(#printArea){display:none!important}#printArea{display:block}#printArea table{font-size:11px}#printArea td,#printArea th{border:1px solid #999;padding:4px}#printArea h1{font-size:16px}}
+
+/* 3.2.0 — ② geçen ayın son 2 günü: işaret listeleri */
+#pmSearch{width:100%;max-width:340px;margin:8px 0}.pm-days{display:grid;grid-template-columns:1fr 1fr;gap:14px}.pm-day>b{display:block;margin-bottom:4px}
+.pm-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:2px 12px}.pm-item{display:flex;align-items:center;gap:6px;font-size:13px;padding:3px 0;cursor:pointer}.pm-item[hidden]{display:none}
+@media (max-width:760px){.pm-days{grid-template-columns:1fr}.pm-item{padding:6px 0}.pm-item input{width:20px;height:20px}}

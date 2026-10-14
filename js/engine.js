@@ -287,7 +287,7 @@
   }
   /* pid -> [{date, reason, kind:'kesin'|'güvenli'}] */
   function boundaryBlocks(db,M,staffList){
-    const month=M.month;const prev=C.prevMonth(month);const prevDates=C.monthDates(prev);const last3=new Set(prevDates.slice(-3));
+    const month=M.month;const prev=C.prevMonth(month);const prevDates=C.monthDates(prev);const last3=new Set(C.priorBoundaryDays(month));/* yalnız son 2 gün bu ayı etkiler */
     const first=C.monthDates(month).slice(0,2);
     const blocks=new Map();const add=(pid,date,reason,kind,src)=>{if(!date.startsWith(month))return;const arr=blocks.get(pid)||blocks.set(pid,[]).get(pid);if(!arr.some(x=>x.date===date&&x.reason===reason))arr.push({date,reason,kind,source:src});};
     const known=new Set();const pendingMatches=[];
@@ -486,7 +486,7 @@
       /* "o gün yazılabilecek 0 kişi" kanıtına NEDEN eklenir: o kategorideki kişilerin o günkü engelleri (güvenli mod, izin, ay sınırı…) */
       const why=p=>{if(p.kind!=="day"||!p.date)return"";const reasons=new Map();for(const q of built.problem.persons){if(!q.cats.includes(p.cat)||!(q.target>0))continue;const r=built.blockedMap[q.pid]&&built.blockedMap[q.pid].get(p.date);if(!r)continue;const k=String(r).replace(/\s*\([^)]*\)\s*$/,"");reasons.set(k,(reasons.get(k)||0)+1);}
         const safe=[...reasons.keys()].some(k=>/güvenli mod/.test(k));
-        return reasons.size?` Nedenler: ${[...reasons.entries()].sort((a,b)=>b[1]-a[1]).map(([k,n])=>`${k} (${n} kişi)`).join("; ")}.${safe?" Çözüm: Adım 1 → ② bölümünde geçen ayın program çıktısını (Excel) yükleyin ya da son 3 günün resmî nöbetlerini elle girip “hepsi burada”yı işaretleyin. İlk ayınızsa ve geçen ay bilinmiyorsa güvenli modu kapatabilirsiniz; o zaman ay başında dinlenme kuralı doğrulanmamış olur.":""}`:"";};
+        return reasons.size?` Nedenler: ${[...reasons.entries()].sort((a,b)=>b[1]-a[1]).map(([k,n])=>`${k} (${n} kişi)`).join("; ")}.${safe?" Çözüm: Adım 1 → ② bölümünde geçen ayın program çıktısını (Excel) yükleyin ya da son 2 günün resmî nöbetlerini elle girip “hepsi burada”yı işaretleyin. İlk ayınızsa ve geçen ay bilinmiyorsa güvenli modu kapatabilirsiniz; o zaman ay başında dinlenme kuralı doğrulanmamış olur.":""}`:"";};
       issues.unshift(...sol.proof.map(p=>({level:"error",code:"INFEASIBLE_PROOF",message:p.message+why(p)})));assignments=[];}
     else if(sol.status!=="feasible"){status="not_found";statusText=`Süre sınırında (${Math.round((sol.stats?.timeLimitMs||0)/1000)} sn) tüm günlük sınırları sağlayan çözüm BULUNAMADI — bu imkânsızlık kanıtı değildir`;(sol.residual||[]).forEach(r=>issues.unshift({level:"error",code:"SOLVER_RESIDUAL",message:`${C.fmtDate(r.date)} ${r.cat}: ${r.type==="max"?"üst sınır":"asgari"} ${r.by} kişi ${r.type==="max"?"aşıldı":"eksik"} (en iyi deneme).`}));}
     else{const errs=issues.filter(x=>x.level==="error");const incomplete=issues.some(x=>x.incomplete);status=errs.length?"invalid":incomplete?"valid_incomplete":"valid_complete";statusText=errs.length?"Bağımsız denetimde REDDEDİLDİ":incomplete?"Kurallara uygun — ancak eksik veri var; TAM DENETLENDİ DEĞİL":"Geçerli — bağımsız denetimden geçti";}
@@ -753,9 +753,9 @@
       arrOf(g.specialShiftRules,x=>obj(x)&&str(x.start)&&str(x.end)&&obj(x.fms),"özel vardiyalar");}
     return true;
   }
-  /* ② geçen ayın son 3 günü: gün başına bilinen resmî nöbetçi sayısı ve bu ayın günlük asgarisine göre beklenen en az sayı (FABLE T13-2) */
+  /* ② geçen ayın son 2 günü: gün başına bilinen resmî nöbetçi sayısı ve bu ayın günlük asgarisine göre beklenen en az sayı (FABLE T13-2) */
   function priorDayCounts(db,M){
-    const days=C.monthDates(C.prevMonth(M.month)).slice(-3);const by=new Map(days.map(d=>[d,new Set()]));
+    const days=C.priorBoundaryDays(M.month);const by=new Map(days.map(d=>[d,new Set()]));
     for(const cat of["Servis","Acil"]){const s=M.priorOfficial[cat];if(!s)continue;for(const p of s.persons||[])for(const d of p.duties||[])if(by.has(d.date))by.get(d.date).add(resolve(db,p.name));}
     for(const x of M.priorManual||[])if(x.kind==="duty"&&by.has(x.date))by.get(x.date).add(x.pid);
     const st=M.settings||{};const min=(C.num(st.serviceMin)||0)+(C.num(st.emergencyMin)||0);

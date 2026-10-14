@@ -2,7 +2,7 @@
    Tüm tarih hesapları YYYY-AA-GG metinleri ve UTC üzerinden yapılır; yerel saat dilimi kayması olmaz. */
 (function(root,factory){const api=factory();if(typeof module==="object"&&module.exports)module.exports=api;root.NobetCore=api;})(typeof globalThis!=="undefined"?globalThis:this,function(){
   "use strict";
-  const VERSION="3.1.1";
+  const VERSION="3.2.0";
   const UNITS=["Servis","Acil","Yoğun Bakım","Yenidoğan","Kıdemli"];
   const CATEGORY_OF_UNIT={"Servis":"Servis","Acil":"Acil","Yoğun Bakım":"Acil","Yenidoğan":"Acil","Kıdemli":"Acil"};
   const MONTHS_TR=["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
@@ -63,6 +63,9 @@
   function dayShort(s){return DAYS_SHORT[weekday(s)];}
   function daysInMonth(month){const[y,m]=String(month).split("-").map(Number);return new Date(Date.UTC(y,m,0)).getUTCDate();}
   function monthDates(month){if(!/^\d{4}-\d{2}$/.test(month||""))return[];const n=daysInMonth(month),out=[];for(let d=1;d<=n;d++)out.push(`${month}-${pad(d)}`);return out;}
+  /* Nöbetten sonra 2 tam gün boş (başlangıçlar arası ≥3 gün) → bu ayı yalnız geçen ayın SON 2 GÜNÜ etkiler (31'i 1–2'yi, 30'u 1'ini kapatır);
+     daha önceki günlerin kapattığı günler geçen ayda kalır (kullanıcı isteği 14.10.2026: 3 gün yerine 2) */
+  function priorBoundaryDays(month){return monthDates(prevMonth(month)).slice(-2);}
   function prevMonth(month){const[y,m]=month.split("-").map(Number);return m===1?`${y-1}-12`:`${y}-${pad(m-1)}`;}
   function nextMonth(month){const[y,m]=month.split("-").map(Number);return m===12?`${y+1}-01`:`${y}-${pad(m+1)}`;}
   function monthLabel(month){const[y,m]=month.split("-").map(Number);return`${MONTHS_TR[m-1]} ${y}`;}
@@ -144,6 +147,6 @@
   function uniq(arr){return[...new Set(arr)];}
 
   return{VERSION,UNITS,CATEGORY_OF_UNIT,MONTHS_TR,DAYS_TR,DEFAULT_FMS_TABLE,fold,cleanSpaces,displayName,personKey,personIdOf,levenshtein,nameSimilarity,
-    ymd,isYmd,validYmd,addDays,dateDiff,weekday,dayName,dayShort,daysInMonth,monthDates,prevMonth,nextMonth,monthLabel,fmtDate,monthFromName,excelSerialToYmd,parseDateValue,
+    ymd,isYmd,validYmd,addDays,dateDiff,weekday,dayName,dayShort,daysInMonth,monthDates,priorBoundaryDays,prevMonth,nextMonth,monthLabel,fmtDate,monthFromName,excelSerialToYmd,parseDateValue,
     standardFms,tableFms,isDaytimeShift,isNightShift,num,round2,fmtNum,sha256Hex,sha256Text,colLetter,a1,parseA1,uid,clone,uniq,trLower,trUpper};
 });
