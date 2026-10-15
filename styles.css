@@ -153,3 +153,13 @@ dialog::backdrop{background:rgba(18,61,58,.35)}
 .rg-in{background:var(--mint);border-radius:0}.rg-start,.rg-end{background:var(--green)!important;color:#fff!important}.rg-start{border-radius:8px 0 0 8px}.rg-end{border-radius:0 8px 8px 0}.rg-start.rg-end{border-radius:8px}
 .rg-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;font-size:12px}.rg-btns{display:flex;gap:6px}
 @media (max-width:760px),(pointer:coarse){.range-wrap{grid-column:1/-1}.rg-day{height:42px}.range-pop{position:fixed;left:16px;right:16px;top:auto;bottom:16px;width:auto}}
+
+/* 3.6.0 tanıtım videosu penceresi */
+dialog.tanitim{border:0;padding:0;border-radius:20px;background:#0b2522;color:#fff;max-width:min(94vw,480px);box-shadow:0 30px 80px rgba(0,0,0,.45);overflow:hidden}
+dialog.tanitim::backdrop{background:rgba(6,20,18,.72)}
+.tanitim-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:14px 12px 10px 18px}
+.tanitim-head strong{display:block;font-size:17px}.tanitim-head span{display:block;font-size:13px;color:#b9d5cf;margin-top:3px}
+.tanitim .icon-btn{color:#d7ebe6}
+.tanitim video{display:block;height:min(64vh,150vw,820px);width:auto;max-width:100%;aspect-ratio:9/16;margin:0 auto;background:#000}
+.tanitim-foot{display:flex;justify-content:center;padding:12px 16px 16px}
+.tanitim-foot .primary{padding:11px 22px;border-radius:12px;font-weight:700;font-size:15px}

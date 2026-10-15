@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self'; font-src 'self'; connect-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -24,6 +24,7 @@
       <div class="menu">
         <button class="ghost" id="dataMenuBtn" type="button" aria-haspopup="true">Veri ▾</button>
         <div class="menu-list" id="dataMenu" hidden>
+          <button type="button" data-action="tanitim">▶ Tanıtım videosu (4 dk)</button>
           <button type="button" data-action="backup">Çalışmayı dosyaya kaydet (.json)</button>
           <button type="button" data-action="restore">Kaydedilmiş çalışmadan devam et…</button>
           <button type="button" data-action="help">Kısa kullanım kılavuzu</button>
@@ -127,6 +128,11 @@
   </main>
 
   <dialog id="dlg"><form method="dialog" id="dlgForm"><div class="dialog-head"><h2 id="dlgTitle"></h2><button value="cancel" class="icon-btn" aria-label="Kapat" formnovalidate>×</button></div><div id="dlgBody" class="dialog-body"></div><div class="dialog-actions"><button value="cancel" class="ghost" id="dlgCancel" formnovalidate>Vazgeç</button><button value="ok" class="primary" id="dlgOk">Tamam</button></div></form></dialog>
+  <dialog id="tanitimDlg" class="tanitim" aria-labelledby="tanitimBaslik">
+    <div class="tanitim-head"><div><strong id="tanitimBaslik">Nöbet Dengeleyici'ye hoş geldiniz</strong><span>4 dakikalık tanıtımı izleyin ya da hemen başlayın.</span></div><button type="button" class="icon-btn" data-tanitim="kapat" aria-label="Kapat">×</button></div>
+    <video id="tanitimVideo" src="media/tanitim.mp4" poster="media/tanitim_kapak.jpg" controls playsinline preload="none"></video>
+    <div class="tanitim-foot"><button type="button" class="primary" data-tanitim="kapat" autofocus>Programa başla →</button></div>
+  </dialog>
 
   <script src="vendor/xlsx.full.min.js"></script>
   <script src="js/core.js"></script>

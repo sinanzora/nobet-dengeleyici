@@ -6,7 +6,7 @@
    Eski sürümlerin (2.x) bu tarayıcıda bıraktığı kalıcı veri bulunursa yalnız okunur: kullanıcı oturuma alabilir ya da silebilir. */
 (function(root){
   "use strict";
-  const KEY="pediatri-nobet-v4",FILE_PREFIX=KEY+".dosya.";
+  const KEY="pediatri-nobet-v4",FILE_PREFIX=KEY+".dosya.",INTRO_KEY=KEY+".tanitim";
   /* eski sürümlerin (2.x) kalıcı veri yerleri — yalnız okuma/silme için */
   const OLD={LS_KEY:"pediatri-nobet-v4",LS_V3:"pediatri-nobet-v3",IDB:"pediatri-nobet-dosyalar",IDB_STORE:"files"};
   /* sessionStorage için tarayıcıların ortak sınırı ≈5 milyon karakter */
@@ -33,7 +33,10 @@
   /* dosyanın sayfa yenilemesine dayanıp dayanmayacağı (oturum belleğinde mi, yalnız bellekte mi) */
   function fileInSession(hash){const S=ss();try{return!!(S&&S.getItem(FILE_PREFIX+hash));}catch(e){return false;}}
   /* ---- bitir ve temizle ---- */
-  function clearSession(){mem.clear();const S=ss();if(!S)return;try{const ks=[];for(let i=0;i<S.length;i++){const k=S.key(i);if(k&&(k===KEY||k.startsWith(FILE_PREFIX)))ks.push(k);}ks.forEach(k=>S.removeItem(k));}catch(e){}}
+  function clearSession(){mem.clear();const S=ss();if(!S)return;try{const ks=[];for(let i=0;i<S.length;i++){const k=S.key(i);if(k&&(k===KEY||k===INTRO_KEY||k.startsWith(FILE_PREFIX)))ks.push(k);}ks.forEach(k=>S.removeItem(k));}catch(e){}}
+  /* 3.6.0 tanıtım videosu: “bu sekmede gösterildi” bilgisi yalnız oturum belleğinde (kalıcı depo yok; “Bitir ve temizle” bunu da siler) */
+  function introSeen(){const S=ss();try{return!!(S&&S.getItem(INTRO_KEY));}catch(e){return false;}}
+  function markIntroSeen(){const S=ss();try{if(S)S.setItem(INTRO_KEY,"1");}catch(e){}}
   function sessionUsage(){const S=ss();let n=0;try{if(S)for(let i=0;i<S.length;i++){const k=S.key(i);if(k&&(k===KEY||k.startsWith(FILE_PREFIX)))n+=k.length+(S.getItem(k)||"").length;}}catch(e){}return{chars:n,limit:SS_LIMIT_APPROX,ratio:n/SS_LIMIT_APPROX};}
   /* ---- çalışmayı dosyaya kaydet / dosyadan devam et (kullanıcının dosyası) ---- */
   async function exportBackup(db){const files=await allFiles();const enc={};for(const[k,v]of Object.entries(files))enc[k]={name:v.name,type:v.type,addedAt:v.addedAt,role:v.role,b64:b64(new Uint8Array(v.bytes))};return{format:"pediatri-nobet-yedek",version:4,createdAt:new Date().toISOString(),db,files:enc};}
@@ -51,5 +54,5 @@
     if(await idbExists()!==false){await new Promise(res=>{try{const r=root.indexedDB.deleteDatabase(OLD.IDB);r.onsuccess=r.onerror=r.onblocked=()=>res();}catch(e){res();}});}
     const left=await findOldData();return{ok:!left.found||(left.idb===null&&!left.raw&&!left.rawV3&&!left.snaps),left};}
   root.NobetStorage={KEY,FILE_PREFIX,OLD,SS_LIMIT:SS_LIMIT_APPROX,BACKUP_FORMAT:"pediatri-nobet-yedek",mode:"oturum",
-    loadDb,saveDb,putFile,getFile,allFiles,fileInSession,clearSession,sessionUsage,exportBackup,importBackup,findOldData,importOldData,deleteOldData,b64,unb64};
+    loadDb,saveDb,putFile,getFile,allFiles,fileInSession,clearSession,sessionUsage,introSeen,markIntroSeen,exportBackup,importBackup,findOldData,importOldData,deleteOldData,b64,unb64};
 })(typeof globalThis!=="undefined"?globalThis:this);

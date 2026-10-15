@@ -61,6 +61,13 @@
   function dialog(title,html,{ok="Tamam",cancel="Vazgeç",wide=false}={}){return new Promise(res=>{const d=$("#dlg");$("#dlgTitle").textContent=title;$("#dlgBody").innerHTML=html;$("#dlgOk").textContent=ok;$("#dlgCancel").textContent=cancel;$("#dlgCancel").hidden=!cancel;d.classList.toggle("wide",wide);d.onclose=()=>{const v=d.returnValue==="ok";const data={};$$("#dlgBody [name]").forEach(el=>{if(el.type==="radio"){if(el.checked)data[el.name]=el.value;}else data[el.name]=el.type==="checkbox"?el.checked:el.value;});res(v?data:null);};d.returnValue="";d.showModal();const f=$("#dlgBody [autofocus]")||$("#dlgBody input,#dlgBody select,#dlgBody textarea");f&&f.focus();});}
 
   /* ---------------- başlatma ---------------- */
+  /* 3.6.0: tanıtım videosu penceresi — video yalnız “oynat”a basılınca yüklenir (preload="none"); kapanınca durur */
+  function setupIntro(){const d=$("#tanitimDlg");if(!d)return;const v=$("#tanitimVideo");
+    d.addEventListener("click",e=>{if(e.target===d||e.target.closest("[data-tanitim=kapat]"))closeIntro();});
+    d.addEventListener("close",()=>{try{if(v)v.pause();}catch(e){}});
+    if(v)v.addEventListener("ended",()=>{const b=d.querySelector(".tanitim-foot .primary");if(b)b.focus();});}
+  function showIntro(){const d=$("#tanitimDlg");if(!d||d.open)return;try{d.showModal();}catch(e){d.setAttribute("open","");}}
+  function closeIntro(){const d=$("#tanitimDlg");if(!d)return;try{$("#tanitimVideo").pause();}catch(e){}if(d.open)d.close();}
   function init(){
     $("#appVersion").textContent=C.VERSION;
     const r=ST.loadDb();
@@ -73,6 +80,8 @@
     /* açılış da “adopt” gibi korumalı: çizim hata verirse yeni oturuma düşülür (FABLE T13b-2) */
     try{E.ensureMonth(db,db.activeMonth);E.checkStale(db);render();}catch(e){rescue={raw:asRescue(db),why:String(e&&e.message||e)};repairNotes=[];db=E.newDb();db.activeMonth=todayMonth();E.ensureMonth(db,db.activeMonth);setTimeout(()=>notify("Oturumdaki çalışma açılamadı ("+(e&&e.message||e)+"); yeni oturum başlatıldı. Üstteki şeritten ham veriyi indirebilirsiniz.",true,15000),300);}
     bind();render();
+    /* 3.6.0: bağlantı açılınca tanıtım (sekme oturumunda bir kez; süren çalışma varsa gösterilmez) */
+    setupIntro();if(!hasWork()&&!ST.introSeen()){ST.markIntroSeen();showIntro();}
     if(repairNotes.length){save("ONARIM",repairNotes.join("; "),{keepClean:true});setTimeout(()=>notify("Oturumdaki bazı kayıtlar okunamadı ve ayrıldı: "+repairNotes.join("; ")+". Çalışmanın geri kalanı korundu; ayrılan kayıtlar üstteki şeritte.",true,15000),400);}
     /* eski sürümün (2.x) kalıcı kaydı: yalnız bulunur; kullanıcı oturuma alır, indirir ya da siler */
     ST.findOldData().then(o=>{oldData=o&&o.found?o:null;renderOldData();}).catch(()=>{});
@@ -427,6 +436,7 @@
       else if(a==="old-delete"){const v=await dialog("Eski kaydı bu bilgisayardan sil",`<p>Eski sürümün bu tarayıcıdaki kalıcı kaydı ve dosyaları <b>kalıcı olarak silinecek</b>. Bu sekmedeki çalışma etkilenmez.</p><label class="check"><input type="checkbox" name="sure"> Gerekirse önce “Dosya olarak indir” ile aldım; silinsin</label>`,{ok:"Sil"});if(!v||!v.sure)return;
         const res=await ST.deleteOldData();oldData=res.ok?null:res.left;renderOldData();notify(res.ok?"Eski kayıt bu bilgisayardan silindi.":"Eski kaydın bir kısmı silinemedi; tarayıcı ayarlarından site verisini temizleyin.",!res.ok,12000);}
       else if(a==="carry-file"){$("#carryInput").click();}
+      else if(a==="tanitim"){$("#dataMenu").hidden=true;showIntro();}
       else if(a==="help")await dialog("Kısa kullanım kılavuzu",HELP,{cancel:"",wide:true});
       else if(a==="talimat")await showTalimat();
       else if(a==="talimat-print"){const T=window.NobetTalimat;if(!T)return;const w=document.createElement("div");w.id="printArea";w.innerHTML=`<style>${T.CSS}</style>`+T.render(window.NobetTalimatVeri,{db,month:m.month,monthLabel:C.monthLabel(m.month)});document.body.appendChild(w);window.print();setTimeout(()=>w.remove(),500);}
