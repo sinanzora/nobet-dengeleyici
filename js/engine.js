@@ -1,4 +1,4 @@
-/* Pediatri Nöbet Dengeleyici — iş kuralları motoru (v2).
+/* Nöbet Dengeleyici — iş kuralları motoru (v2).
    Üç ayrı doğru ayrı tutulur: FİİLÎ nöbet (hastane Excel'i), RESMÎ çizelge (PROBEL), BORDRO/DEVİR (defter).
    Ortak birim: Servis-eşdeğeri FMS saati = Servis FMS × 1 + Acil ailesi FMS × 1,5. */
 (function(root,factory){const api=factory(root.NobetCore,root.NobetSolver,root.NobetAuditor);if(typeof module==="object"&&module.exports)module.exports=api;root.NobetEngine=api;})(typeof globalThis!=="undefined"?globalThis:this,function(C,S,A){
@@ -263,7 +263,7 @@
       let allowed=[];let catSource="";
       if(history.length===1){allowed=[...history];catSource="fiilî kaynak (tek kategori)";if(st.officialCategory&&st.officialCategory!==history[0])catSource+=" — seçilen kategori kaynakta yok, yok sayıldı";}
       else if(history.length>1){if(st.officialCategory&&history.includes(st.officialCategory)){allowed=[st.officialCategory];catSource="fiilî karma; kullanıcı seçti";}else{allowed=[...history];catSource="fiilî karma; çözücü birini seçer";}}
-      else if(st.authorizedCategory){allowed=[st.authorizedCategory];catSource=`fiilî yok; ${st.authorizedBy||"kullanıcı"} yetkilendirdi`;}
+      else if(st.authorizedCategory){allowed=[st.authorizedCategory];catSource="fiilî yok; kategori elle seçildi";}
       const open=openBalance(M,p.pid);
       out.push({pid:p.pid,name:p.name,rows:p.rows,actualDays:C.uniq(dutyRows.map(r=>r.date)).length,actualDates:C.uniq(p.rows.map(r=>r.date)).sort(),history,allowed,catSource,servisFms,acilFms,complete,earnedComputed,earnedOverride:ov,earnedTarget,overrideNote:st.earnedOverride?.note||"",
         excluded:(M.exclusions||[]).includes(p.pid),staff:st,openBalance:open,unverified:p.rows.filter(r=>r.eq==null).length,reviewNeeded:p.rows.filter(r=>r.reviewNeeded).length,orientationOnly:p.rows.length>0&&history.length===0});
@@ -352,7 +352,7 @@
       const off=dates.map(d=>new Set((assignments||[]).filter(a=>a.date===d&&a.category===cat).map(a=>a.pid)).size);
       const low=dates.filter((d,i)=>off[i]<actMin);if(!low.length)continue;
       const mins=C.uniq(lim.map(l=>l[cat].min==null?"—":String(l[cat].min)));
-      out.push({level:"warning",code:"STAFFING_BELOW_ACTUAL",message:`${cat}: fiilî listede her gün en az ${actMin} kişi var; resmî öneride ${low.length} gün ${actMin} kişiden az (${low.slice(0,15).map(d=>C.fmtDate(d).slice(0,5)).join(", ")}${low.length>15?" …":""}). Program yalnız Adım 3'teki günlük asgari değere (${cat} en az ${mins.join("/")}) uyar; resmî listedeki günlük ${cat} kadrosunun kurumca kabul edilebilir olduğunu yetkiliyle teyit edin.`,cat,days:low});
+      out.push({level:"warning",code:"STAFFING_BELOW_ACTUAL",message:`${cat}: fiilî listede her gün en az ${actMin} kişi var; resmî öneride ${low.length} gün ${actMin} kişiden az (${low.slice(0,15).map(d=>C.fmtDate(d).slice(0,5)).join(", ")}${low.length>15?" …":""}). Program yalnız Adım 3'teki günlük asgari değere (${cat} en az ${mins.join("/")}) uyar; resmî listedeki günlük ${cat} kadrosunun yeterli olduğunu kontrol edin.`,cat,days:low});
     }
     return out;
   }
@@ -373,7 +373,7 @@
     const fx=sol&&sol.stats&&sol.stats.categoryFixed||[];
     if(fx.length)out.push({level:"info",code:"CATEGORY_IMPROVED",message:`Kategori iyileştirmesi: ${fx.map(x=>`${x.name} → ${x.category}`).join(", ")} (fazla ödeme ${C.fmtNum(sol.stats.overFirst)} → ${C.fmtNum(sol.stats.overTotal)} eşdeğer saat). İki bölümde de çalışmış kişiler için kategori seçimi Adım 2'den değiştirilebilir.`});
     const pd=postedDiff(db,M,assignments);
-    if(pd&&(pd.added.length||pd.removed.length))out.push({level:"warning",code:"POSTED_CHANGES",message:`Bu ayın PROBEL'e işlenmiş ${pd.posted} nöbetinden ${pd.kept} tanesi öneride aynen var; öneri ${pd.removed.length} nöbeti kaldırıp ${pd.added.length} yeni nöbet ekliyor${pd.keepPosted?"":" (“işlenmiş nöbetleri koru” KAPALI)"}. Değişiklikler yetkili onayı olmadan PROBEL'e işlenmemeli (Adım 4 → “PROBEL farkı”).`});
+    if(pd&&(pd.added.length||pd.removed.length))out.push({level:"warning",code:"POSTED_CHANGES",message:`Bu ayın PROBEL'e işlenmiş ${pd.posted} nöbetinden ${pd.kept} tanesi öneride aynen var; öneri ${pd.removed.length} nöbeti kaldırıp ${pd.added.length} yeni nöbet ekliyor${pd.keepPosted?"":" (“işlenmiş nöbetleri koru” KAPALI)"}. PROBEL'e işlemeden önce değişiklikleri kontrol edin (Adım 4 → “PROBEL farkı”).`});
     return{issues:out,postedDiff:pd,overBound:ob};
   }
   function dailyLimits(M){
@@ -517,14 +517,14 @@
   function openBalance(M,pid){return ledgerBalances(M).filter(c=>c.pid===pid).reduce((s,c)=>s+c.open,0);}
   function ledgerBalances(M){
     const claims=new Map();
-    for(const e of M.ledger||[])if(e.kind==="carry-open"){claims.set(e.claimId,{claimId:e.claimId,pid:e.pid,sourceMonth:e.sourceMonth,units:C.num(e.units)||0,settled:0,approvedBy:e.approvedBy||"",note:e.note||"",reversed:false});}
+    for(const e of M.ledger||[])if(e.kind==="carry-open"){claims.set(e.claimId,{claimId:e.claimId,pid:e.pid,sourceMonth:e.sourceMonth,units:C.num(e.units)||0,settled:0,approvedBy:e.approvedBy||"",reference:e.reference||"",note:e.note||"",reversed:false});}
     for(const e of M.ledger||[]){const c=claims.get(e.claimId);if(!c)continue;if(e.kind==="payment"||e.kind==="carry-settled")c.settled+=C.num(e.units)||0;if(e.kind==="carry-reversed")c.reversed=true;}
     return[...claims.values()].map(c=>({...c,open:c.reversed?0:Math.max(0,C.round2(c.units-c.settled)),overSettled:c.settled>c.units+1e-9}));
   }
   function addLedger(db,month,ev){
     const M=db.months[month];const e={id:C.uid("defter"),at:new Date().toISOString(),...ev};
     if(["payment","carry-settled"].includes(e.kind)){const bal=ledgerBalances(M).find(c=>c.claimId===e.claimId);if(!bal)throw new Error("Ödeme/mahsup bağlı olduğu alacak kaydı (claimId) bulunamadı.");if((C.num(e.units)||0)>bal.open+1e-9)throw new Error(`Çift ödeme engellendi: açık bakiye ${bal.open}, girilen ${e.units}.`);if(!e.reference)throw new Error("Ödeme/mahsup için bordro/belge referansı zorunlu.");}
-    if(e.kind==="carry-open"){if(!e.approvedBy)throw new Error("Devir alacağı açmak için yetkili onayı zorunlu.");e.claimId=e.claimId||C.uid("alacak");}
+    if(e.kind==="carry-open"){e.claimId=e.claimId||C.uid("alacak");}/* 3.3.3: ad istenmez */
     M.ledger.push(e);log(M,"DEFTER",`${e.kind} ${e.claimId||""} ${e.units}`);
     if(M.result)M.result.reconciliation=reconcile(db,M,M.result);
     return e;
@@ -607,8 +607,8 @@
     /* açık önceki alacaklar */
     for(const c of ledgerBalances(M))if(c.open>0.001&&!existing.has(c.claimId+"|carry-open"))N.ledger.push({id:C.uid("defter"),at:new Date().toISOString(),kind:"carry-open",claimId:c.claimId,pid:c.pid,sourceMonth:c.sourceMonth,units:c.open,approvedBy:c.approvedBy,note:`${C.monthLabel(month)} kapanışından devreden açık bakiye`});
     for(const x of rec){
-      if(x.decision==="onaylı açık devir"&&x.carry>0){const claimId=`alacak-${month}-${x.pid}`;if(!existing.has(claimId+"|carry-open"))N.ledger.push({id:C.uid("defter"),at:new Date().toISOString(),kind:"carry-open",claimId,pid:x.pid,sourceMonth:month,units:x.carry,approvedBy:M.settings.approvedBy,note:`${C.monthLabel(month)} dönem farkı (ödenmemiş, onaylı)`});}
-      else if(x.decision.startsWith("mutabakat bekliyor")){const claimId=`bekleyen-${month}-${x.pid}`;if(!existing.has(claimId+"|reconciliation-pending"))N.ledger.push({id:C.uid("defter"),at:new Date().toISOString(),kind:"reconciliation-pending",claimId,pid:x.pid,sourceMonth:month,units:x.difference,note:"Ödeme durumu/yetkili onayı bekleniyor — kesin alacak DEĞİL"});}
+      if(x.decision==="onaylı açık devir"&&x.carry>0){const claimId=`alacak-${month}-${x.pid}`;if(!existing.has(claimId+"|carry-open"))N.ledger.push({id:C.uid("defter"),at:new Date().toISOString(),kind:"carry-open",claimId,pid:x.pid,sourceMonth:month,units:x.carry,note:`${C.monthLabel(month)} dönem farkı (ödenmedi, devret işaretli)`});}
+      else if(x.decision.startsWith("mutabakat bekliyor")){const claimId=`bekleyen-${month}-${x.pid}`;if(!existing.has(claimId+"|reconciliation-pending"))N.ledger.push({id:C.uid("defter"),at:new Date().toISOString(),kind:"reconciliation-pending",claimId,pid:x.pid,sourceMonth:month,units:x.difference,note:"Ödeme durumu bekleniyor — kesin alacak DEĞİL"});}
       else if(x.decision==="ödenmiş — devir yok"){const claimId=`odenmis-${month}-${x.pid}`;if(!M.ledger.some(e=>e.claimId===claimId&&e.kind==="note"))M.ledger.push({id:C.uid("defter"),at:new Date().toISOString(),kind:"note",claimId,pid:x.pid,units:x.difference,note:"Plan farkı bordroda ödenmiş olarak işaretlendi; devredilmedi"});}
     }
     pullPriorFromPrevious(db,nm,{force:true});
@@ -628,8 +628,8 @@
     const M=db.months[month];const r=M.result;const out=[];if(!r)return out;
     for(const c of ledgerBalances(M))if(c.open>0.001)out.push({kind:"carry-open",claimId:c.claimId,pid:c.pid,sourceMonth:c.sourceMonth,units:c.open,approvedBy:c.approvedBy,note:C.monthLabel(month)+" kapanışından devreden açık bakiye"});
     for(const x of reconcile(db,M,r)){
-      if(x.decision==="onaylı açık devir"&&x.carry>0)out.push({kind:"carry-open",claimId:"alacak-"+month+"-"+x.pid,pid:x.pid,sourceMonth:month,units:x.carry,approvedBy:M.settings.approvedBy,note:C.monthLabel(month)+" dönem farkı (ödenmemiş, onaylı)"});
-      else if(x.decision.startsWith("mutabakat bekliyor"))out.push({kind:"reconciliation-pending",claimId:"bekleyen-"+month+"-"+x.pid,pid:x.pid,sourceMonth:month,units:x.difference,note:"Ödeme durumu/yetkili onayı bekleniyor — kesin alacak DEĞİL"});}
+      if(x.decision==="onaylı açık devir"&&x.carry>0)out.push({kind:"carry-open",claimId:"alacak-"+month+"-"+x.pid,pid:x.pid,sourceMonth:month,units:x.carry,note:C.monthLabel(month)+" dönem farkı (ödenmedi, devret işaretli)"});
+      else if(x.decision.startsWith("mutabakat bekliyor"))out.push({kind:"reconciliation-pending",claimId:"bekleyen-"+month+"-"+x.pid,pid:x.pid,sourceMonth:month,units:x.difference,note:"Ödeme durumu bekleniyor — kesin alacak DEĞİL"});}
     return out;
   }
   function carryPayload(db,month,result){

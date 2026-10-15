@@ -128,10 +128,10 @@
     let st=zip.read("xl/styles.xml");if(!st)return null;const P=nsPrefix(st,"styleSheet");const eP=escRe(P);
     const countOf=tag=>{const m=st.match(new RegExp(`<${eP}${tag}\\b[^>]*count="(\\d+)"`));if(m)return+m[1];const block=st.match(new RegExp(`<${eP}${tag}\\b[^>]*>([\\s\\S]*?)<\\/${eP}${tag}>`));return block?(block[1].match(new RegExp(`<${eP}${tag.slice(0,-1)}\\b`,"g"))||[]).length:0;};
     const push=(tag,items)=>{const start=countOf(tag);const re=new RegExp(`(<${eP}${tag}\\b[^>]*>)([\\s\\S]*?)(<\\/${eP}${tag}>)`);if(!re.test(st))return null;st=st.replace(re,(m,a,b,c)=>a.replace(/count="\d+"/,`count="${start+items.length}"`)+b+items.map(x=>withPrefix(x,P)).join("")+c);return start;};
-    const fBold=push("fonts",['<font><b/><sz val="11"/><name val="Calibri"/><family val="2"/></font>','<font><b/><sz val="13"/><name val="Calibri"/><family val="2"/></font>']);
+    const fBold=push("fonts",['<font><b/><sz val="11"/><name val="Calibri"/><family val="2"/></font>','<font><b/><sz val="13"/><name val="Calibri"/><family val="2"/></font>','<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font>']);
     const fill=push("fills",['<fill><patternFill patternType="solid"><fgColor rgb="FFD9EAD3"/><bgColor indexed="64"/></patternFill></fill>','<fill><patternFill patternType="solid"><fgColor rgb="FFF4CCCC"/><bgColor indexed="64"/></patternFill></fill>','<fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill>','<fill><patternFill patternType="solid"><fgColor rgb="FFDDEBF7"/><bgColor indexed="64"/></patternFill></fill>',
-      /* PROBEL ekranındaki gün etiketi renkleri: H.İçi sarı, Cuma mor, C.tesi turuncu, Pazar mavi, NSİ gri */
-      ...["FFFFFF00","FFCC99FF","FFF4B084","FF33CCFF","FFE7E6E6"].map(c=>`<fill><patternFill patternType="solid"><fgColor rgb="${c}"/><bgColor indexed="64"/></patternFill></fill>`)]);
+      /* PROBEL ekranındaki renkler: H.İçi sarı, Cuma mor, C.tesi turuncu, Pazar mavi, (eski) NSİ gri; 3.3.3: mesai yeşil, hafta sonu gri, Yİz. açık mavi, Bşl. turuncu-kırmızı, Rpr. mor, GÖREV turkuaz, R.T. kırmızı */
+      ...["FFFFFF00","FFCC99FF","FFF4B084","FF33CCFF","FFE7E6E6","FF33FF33","FFD0D0D0","FF7DD3F7","FFFF6633","FF9C6BFF","FF6FE3E3","FFE53935"].map(c=>`<fill><patternFill patternType="solid"><fgColor rgb="${c}"/><bgColor indexed="64"/></patternFill></fill>`)]);
     const bor=push("borders",['<border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border>']);
     if(fBold==null||fill==null||bor==null)return null;
     const al='<alignment vertical="top" wrapText="1"/>';
@@ -142,11 +142,15 @@
       `<xf numFmtId="0" fontId="0" fillId="${fill+1}" borderId="${bor}" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1">${al}</xf>`,
       `<xf numFmtId="0" fontId="0" fillId="${fill+2}" borderId="${bor}" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1">${al}</xf>`,
       `<xf numFmtId="0" fontId="0" fillId="${fill}" borderId="${bor}" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1">${al}</xf>`,
-      ...[4,5,6,7,8].map(k=>`<xf numFmtId="0" fontId="0" fillId="${fill+k}" borderId="${bor}" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>`)
+      ...[4,5,6,7,8,9,10,11].map(k=>`<xf numFmtId="0" fontId="0" fillId="${fill+k}" borderId="${bor}" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>`),
+      `<xf numFmtId="0" fontId="${fBold}" fillId="${fill+10}" borderId="${bor}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">${al}</xf>`,
+      `<xf numFmtId="0" fontId="0" fillId="${fill+12}" borderId="${bor}" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>`,
+      ...[13,14].map(k=>`<xf numFmtId="0" fontId="0" fillId="${fill+k}" borderId="${bor}" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>`),
+      `<xf numFmtId="0" fontId="${fBold+2}" fillId="${fill+15}" borderId="${bor}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>`
     ];
     const x0=push("cellXfs",xfs);if(x0==null)return null;
     zip.write("xl/styles.xml",st);
-    return{cell:x0,header:x0+1,title:x0+2,error:x0+3,warn:x0+4,ok:x0+5,pHici:x0+6,pCuma:x0+7,pCtesi:x0+8,pPazar:x0+9,pNsi:x0+10};
+    return{cell:x0,header:x0+1,title:x0+2,error:x0+3,warn:x0+4,ok:x0+5,pHici:x0+6,pCuma:x0+7,pCtesi:x0+8,pPazar:x0+9,pNsi:x0+10,pMesai:x0+11,pHs:x0+12,pYiz:x0+13,pHsHead:x0+14,pBsl:x0+15,pRpr:x0+16,pGorev:x0+17,pRt:x0+18};
   }
   /* rapor sayfası XML'i (satır dizileri). rows: [[değer|{v,s}]] */
   function reportSheetXml(rows,opts={}){

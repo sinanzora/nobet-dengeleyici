@@ -32,7 +32,7 @@
     const wDesc={over:"Fazla ödeme cezası (eşdeğer saat başına)",short:"Eksik kalan hakediş cezası (yalnız onaylı devir modunda)",day:"Görev günü başına küçük maliyet (gereksiz gün azaltılır)",actual:"Kişinin fiilen çalıştığı güne yazma ödülü",weekend:"Hafta sonu cezası",avoid:"Kişinin “kaçınılsın” dediği gün cezası",prefer:"Kişinin “tercih” ettiği gün ödülü",balanceServis:"Servis günlük yük dengesi",balanceAcil:"Acil günlük yük dengesi",hard:"Günlük sınır ihlalinin başlangıç fiyatı (ihlal sürdükçe artar)",switch:"Kategori değiştirme cezası",posted:"Bu ayın PROBEL'e işlenmiş nöbetini koruma ödülü (yalnız bu ayın PROBEL listesi yüklü ve “koru” açıkken; kesin kural değil)"};
     const imp=d.solver.improve||{};
     let h=`<div class="tal">
-    <h1>Pediatri Nöbet Dengeleyici — Talimatname</h1>
+    <h1>Nöbet Dengeleyici — Talimatname</h1>
     <p class="meta">Sürüm ${esc(d.version)} · Parametre imzası <code>${esc(String(d.signature||"").slice(0,16))}</code> · Bu belge programın <b>kendi kodundan otomatik</b> üretilmiştir; program güncellendikçe yeniden üretilir (elle düzenlenmez).</p>
     <div class="box">Bu talimatname uygulamanın kullandığı <b>tüm parametreleri</b>, sabit kuralları, her ay kullanıcıya sorulan değerleri, içe aktarma ve PROBEL okuma kurallarını, çözücü ayarlarını, Excel çıktısını, depolamayı ve programın gösterebileceği tüm hata/uyarı kodlarını listeler. Uygulama içindeki “Veri ▸ Talimatname” ekranı ayrıca o ayın <b>güncel</b> değerlerini gösterir.</div>
 
@@ -65,12 +65,12 @@
       ["“Bu ay resmî tatil var mı?”","cevapsız","<b>Her ay sorulur</b>; Evet ise günler ve her günün FMS'i girilip onaylanır"],
       ["“Bu ay yarım gün çalışma var mı?” (ör. bayram arifesi)","cevapsız","<b>Her ay sorulur</b>; Evet ise günler girilir. Nöbet FMS'i sorulmaz (yetkili kuralı, bölüm 1); hafta içi arefede özel vardiyaların yarım gün FMS'i ayrıca istenir"],
       ["Geçen ayın son 2 günündeki resmî nöbetler","girilmedi","Geçen ayın program çıktısı Excel'inden gelir ya da elle işaretlenir; girilen kayıt tam sayılır (bölüm 4)"],
-      ["Hakediş modu",d.monthDefaults.mode==="strict"?"Devirsiz":"Onaylı devir","Devirsiz: resmî karşılık fiilî hakedişten az olamaz. Onaylı devir: eksik kalan fark yetkili onayıyla sonraki aya devredilebilir"],
+      ["Hakediş modu",d.monthDefaults.mode==="strict"?"Devirsiz":"Onaylı devir","Devirsiz: resmî karşılık fiilî hakedişten az olamaz. Onaylı devir: eksik kalan fark, kişide “ödenmedi” + “sonraki aya devret” işaretlenince sonraki aya devreder"],
       ["Başlangıç kontrol edildi (kişi)","—","Oryantasyonla başlayan ya da geçen ayın fiilî listesinde olmayan kişi için “yeni mi başladı?” uyarısını kapatır; yeni başladıysa bunun yerine “Henüz başlamadı” izni girilir. Program başlama tarihini tahmin etmez"],
       ["İzin = personelin ÇALIŞMADIĞI her gün","—",`Sebepler (yalnız bilgi; hepsi aynı işlenir, o günlerde resmî nöbet yazılmaz): ${(d.leaveReasons||[]).map(esc).join(", ")}. İşten ayrılış: ayrıldığı günden ay sonuna; henüz başlamadı: ay başından başladığı güne kadar girilir. Ay sınırını aşan izin sonraki aya taşınır. İzinli günde fiilî nöbet varsa uyarı verilir.`],
       ["Hariç tutulanlar, nöbet tercihleri","—","Hariç tutma yalnız ilgili ay için (taşınmaz). “Nöbet istemiyor / istiyor / yalnız bu aralıkta” izin değil, tercihtir"],
       ["Onaylı hakediş (kişi)","—","Satır hesabı yerine onaylı değer; not/kaynak zorunlu; fark uyarı olarak kalır ve uyarı kaynak satırlarını listeler. Önerilen yol kayıt düzeyinde düzeltmedir: hakedişe girmemesi gereken kayıt gerekçesiyle “hakediş dışı” bırakılır (kaynak silinmez), eksik kayıt kaynağıyla elle eklenir"],
-      ["Kategori/klinik yetki (kişi)","—","Fiilî kaydı olmayan kişiyi bir kategoriye yazmak için; yetkilendiren adı zorunlu"]])}
+      ["Kategori/klinik yetki (kişi)","—","Fiilî kaydı olmayan kişiyi bir kategoriye yazmak için (Adım 2'de seçilir; ad sorulmaz)"]])}
 
     <h2>3. Özel vardiyalar ve oryantasyon</h2>
     <p>Excel'de saat notuyla yazılmış görevler için FMS, gün türüne göre kullanıcı tarafından girilir; değerler kaydedilir ve sonraki aylarda tekrar sorulmaz. Adım 3 tablosunda yalnız o ay gerçekten kaydı olan gün türü sorulur (diğer hücreler “bu ay gerekmiyor”). Boş değer o kaydı “veri eksik” bırakır. İstisnalar (yetkili kuralı, bölüm 1): gündüz mesaisinin Cumartesi/Pazar/resmî tatil değeri sabittir (sorulmaz); gece görevi tek başına sayılmaz.</p>
@@ -131,7 +131,7 @@
     ${table(["Durum","Yazılan etiket"],d.holidayLabels.map(x=>[esc(x.case),`<code>${esc(x.label)}</code>`]))}
 
     <h2>9. Devir defteri</h2>
-    <p>Kayıt türleri: ${d.ledgerKinds.map(k=>`<code>${esc(k)}</code>`).join(", ")}. Devir alacağı açmak için yetkili onayı, ödeme/mahsup için bordro/belge referansı zorunludur; açık bakiyeden fazla ödeme engellenir (çift ödeme engeli). Kayıtlar silinmez.</p>
+    <p>Kayıt türleri: ${d.ledgerKinds.map(k=>`<code>${esc(k)}</code>`).join(", ")}. Elle alacak açarken ad sorulmaz; ödeme/mahsup için bordro/belge referansı zorunludur; açık bakiyeden fazla ödeme engellenir (çift ödeme engeli). Kayıtlar silinmez.</p>
 
     <h2>10. Verilerin saklanması</h2>
     ${table(["Öğe","Değer"],[
@@ -167,6 +167,6 @@
       ["Oryantasyon nöbeti","gerçek nöbet (sabit kural)"],
       ["FMS tablosu (Pzt…Paz)",[1,2,3,4,5,6,0].map(i=>num((g.fmsTable||{})[i])).join(" / ")],["Arefe nöbeti (hafta içi) / gündüz mesaisi (Cts/Paz/tatil)",`${num(rule(g,"halfday"))} / ${num(rule(g,"daytime"))}`],["Katsayılar",Object.entries(g.factors||{}).map(([c,f])=>`${esc(c)} ×${num(f)}`).join(", ")]])}`;
   }
-  function documentHtml(d,live){return`<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Talimatname — Pediatri Nöbet Dengeleyici ${esc(d&&d.version)}</title><style>${BODY_CSS}${CSS}</style></head><body>${render(d,live)}</body></html>`;}
+  function documentHtml(d,live){return`<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Talimatname — Nöbet Dengeleyici ${esc(d&&d.version)}</title><style>${BODY_CSS}${CSS}</style></head><body>${render(d,live)}</body></html>`;}
   return{render,documentHtml,CSS};
 });

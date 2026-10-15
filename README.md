@@ -1,4 +1,4 @@
-# Pediatri Nöbet Dengeleyici 3.3.2
+# Nöbet Dengeleyici 3.3.3
 
 Tarayıcıda çalışan nöbet çizelgesi ve hakediş mutabakatı aracı.
 
