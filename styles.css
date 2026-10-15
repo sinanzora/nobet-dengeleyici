@@ -7,7 +7,8 @@ button{cursor:pointer}
 h1,h2,h3{line-height:1.2}
 .topbar{min-height:70px;background:#123d3a;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:10px 28px;position:sticky;top:0;z-index:20;box-shadow:0 8px 28px rgba(10,47,43,.18)}
 .brand{display:flex;align-items:center;gap:12px}
-.brand-mark{width:42px;height:42px;border-radius:12px;background:linear-gradient(140deg,#f6b44a,#f28245);display:grid;place-items:center;color:#17312f;font-weight:900}
+.brand-mark{width:42px;height:42px;flex:0 0 42px;border-radius:12px;overflow:hidden;background:#f28245}
+.brand-mark svg{display:block;width:100%;height:100%}
 .brand strong,.brand>div>span{display:block}.brand strong{font-size:17px}.brand>div>span{font-size:12px;color:#b9d5cf;margin-top:2px}
 .month-control{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .month-control label{font-size:12px;color:#c9dfda}
