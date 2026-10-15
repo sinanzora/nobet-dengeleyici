@@ -192,7 +192,7 @@
   /* NSİ kişinin zaten çalışmadığı bir iş gününe düşerse PROBEL o günü gereken saatten saymaz: nöbet 8 FMS fazla yazılır
      (kanıt: kullanıcının Ağustos ve Eylül 2026 PROBEL ekranları — Pazar nöbeti → ertesi gün yıllık izin başı; Perşembe nöbeti → ertesi gün ayrılış) */
   function leaveNsiDates(db,M,pid){const dates=C.monthDates(M.month);const out=new Set();for(let i=0;i<dates.length-1;i++){const n=dates[i+1];if(isWorkday(db,n)&&notRequired(M,pid,n)&&!notRequired(M,pid,dates[i]))out.add(dates[i]);}return out;}
-  function boundaryAdj(db,M,pid,assignments,bi){bi=bi||boundaryInfo(db,M);const mine=(assignments||[]).filter(a=>a.pid===pid);
+  function boundaryAdj(db,M,pid,assignments,bi){bi=bi||boundaryInfo(db,M);const mine=(assignments||[]).filter(a=>a.pid===pid&&a.kind!=="mesai");/* mesainin NSİ'si yok */
     const plus=bi.lastBonus&&mine.some(a=>a.date===bi.last)?bi.lastBonus:0;const minus=bi.firstWork&&bi.prior.has(pid)&&!notRequired(M,pid,bi.first)?BOUNDARY_FMS:0;
     const ln=leaveNsiDates(db,M,pid);const ld=mine.filter(a=>ln.has(a.date)).map(a=>a.date);const leave=ld.length*BOUNDARY_FMS;
     const t=[];if(plus)t.push(`${C.fmtDate(bi.last)} nöbetinin ertesi günü (${C.fmtDate(bi.next1)}) sonraki aya düşer: +${plus}`);if(minus)t.push(`${C.fmtDate(bi.prevLast)} resmî nöbetinin ertesi günü (${C.fmtDate(bi.first)}) bu aya düşer: −${minus}`);if(leave)t.push(`${ld.map(d=>C.fmtDate(d)).join(", ")} nöbetinin ertesi günü izinli/ayrılmış olduğu güne düşer: +${leave}`);
@@ -217,6 +217,12 @@
   function dayFmsProblem(h){return!h?"Standart FMS tablosunda değer yok":h.kind===HALF?`Arefe (yarım gün, ${h.label}) nöbet FMS değeri tabloda boş`:`Resmî tatil (${h.label}) FMS değeri onaylanmadı`;}
   /* hafta sonu ya da resmî tatil (yarım gün hariç): gündüz mesaisi kuralı bu günlerde geçerli */
   function offDay(M,date){const wd=C.weekday(date);if(wd===0||wd===6)return true;const h=(M.settings.holidays||[]).find(h=>h.date===date);return!!h&&h.kind!==HALF;}
+  /* HAFTA SONU MESAİSİ (3.5.0 — kurum kararı, kullanıcı 15.10.2026): fiilî listede HİÇ nöbeti olmayıp yalnız hafta sonu/tatil gündüz mesaisi
+     (08–09 başlar, 16–17 biter) yapan kişi resmî listeye nöbet olarak yazılmaz; PROBEL'e aynı günlere fiilî saatle mesai girilir (her gün tablo
+     “daytime” değeri, 8 FMS). Karışık kişide (nöbet + mesai) eski usul: mesai hakedişe katılır, resmî tarafta nöbetle karşılanır. */
+  function isWeekendMesaiOnly(M,s){const rs=(s.rows||[]).filter(r=>r.duty!==false);return rs.length>0&&rs.every(r=>r.shift&&C.isDaytimeShift(r.shift)&&offDay(M,r.date)&&r.fms!=null);}
+  function mesaiAssignments(db,M,staff){const out=[];for(const s of staff){if(s.excluded||!isWeekendMesaiOnly(M,s))continue;for(const r of s.rows.filter(x=>x.duty!==false)){if(out.some(a=>a.pid===s.pid&&a.date===r.date))continue;
+    out.push({id:`mesai-${M.month}-${s.pid}-${r.date}`,pid:s.pid,name:s.name,date:r.date,category:r.category,fms:r.fms,eq:C.round2(r.fms*db.global.factors[r.category]),kind:"mesai",shift:{start:r.shift.start,end:r.shift.end},source:"hafta sonu mesai (fiilî)"});}}return out;}
   function isShiftPart(r){return!!(r.shift&&!(r.shift.start==="08:00"&&r.shift.end==="08:00"))&&!r.orientation&&!(r.fmsOverride!=null&&r.fmsOverride!=="");}
   function isSplitDay(list){return list.length>=2&&list.every(r=>isShiftPart(r)&&!!C.CATEGORY_OF_UNIT[r.unit])&&new Set(list.map(r=>r.unit)).size>=2;}
   /* Her aktif fiilî kayıt için FMS, kaynağı ve eşdeğer saat. */
@@ -366,7 +372,7 @@
   function postedDiff(db,M,assignments){
     const posted=[];for(const{cat,src}of postedSources(M))for(const q of src.persons||[]){const pid=resolve(db,q.name);for(const d of q.duties||[])if(String(d.date||"").startsWith(M.month))posted.push({pid,name:personName(db,pid),date:d.date,category:cat});}
     if(!posted.length)return null;
-    const key=x=>`${x.pid}|${x.date}|${x.category}`;const P=new Set(posted.map(key)),A=new Set((assignments||[]).map(key));
+    const key=x=>`${x.pid}|${x.date}|${x.category}`;assignments=(assignments||[]).filter(x=>x.kind!=="mesai");/* mesai nöbet değildir */const P=new Set(posted.map(key)),A=new Set(assignments.map(key));
     const removed=posted.filter(x=>!A.has(key(x))).sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name,"tr"));
     const added=(assignments||[]).filter(x=>!P.has(key(x))).map(x=>({pid:x.pid,name:x.name||personName(db,x.pid),date:x.date,category:x.category})).sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name,"tr"));
     return{posted:posted.length,kept:posted.length-removed.length,added,removed,keepPosted:M.settings.keepPosted!==false};
@@ -377,7 +383,7 @@
     for(const cat of["Servis","Acil"]){
       const act=dates.map(d=>new Set(rows.filter(r=>r.date===d&&r.category===cat&&r.duty!==false).map(r=>r.pid)).size);
       const actMin=Math.min(...act);if(!(actMin>0))continue;
-      const off=dates.map(d=>new Set((assignments||[]).filter(a=>a.date===d&&a.category===cat).map(a=>a.pid)).size);
+      const off=dates.map(d=>new Set((assignments||[]).filter(a=>a.date===d&&a.category===cat&&a.kind!=="mesai").map(a=>a.pid)).size);
       const low=dates.filter((d,i)=>off[i]<actMin);if(!low.length)continue;
       const mins=C.uniq(lim.map(l=>l[cat].min==null?"—":String(l[cat].min)));
       out.push({level:"warning",code:"STAFFING_BELOW_ACTUAL",message:`${cat}: fiilî listede her gün en az ${actMin} kişi var; resmî öneride ${low.length} gün ${actMin} kişiden az (${low.slice(0,15).map(d=>C.fmtDate(d).slice(0,5)).join(", ")}${low.length>15?" …":""}). Program yalnız Adım 3'teki günlük asgari değere (${cat} en az ${mins.join("/")}) uyar; resmî listedeki günlük ${cat} kadrosunun yeterli olduğunu kontrol edin.`,cat,days:low});
@@ -476,7 +482,7 @@
     const dates=C.monthDates(M.month);const fmsByDate=dates.map(d=>stdFms(db,M,d));const bi=boundaryInfo(db,M);
     const persons=[];const blockedMap={};
     for(const s of staff){
-      if(s.excluded||!(s.earnedTarget>0)||!s.allowed.length)continue;
+      if(s.excluded||!(s.earnedTarget>0)||!s.allowed.length||isWeekendMesaiOnly(M,s))continue;/* 3.5.0: yalnız hafta sonu mesaisi yapan çözücüye girmez */
       const blocks=personBlocks(db,M,s,bnd);blockedMap[s.pid]=blocks;
       const settle=s.staff.settlePrior?Math.max(0,s.openBalance):0;
       const ad={Servis:new Set(),Acil:new Set()},any=new Set();
@@ -505,6 +511,7 @@
     }
     const sol=S.solve(built.problem);
     let assignments=(sol.assignments||[]).map((a,i)=>({id:`resmi-${month}-${i+1}`,pid:a.pid,name:personName(db,a.pid),date:a.date,category:a.category,fms:a.fms,eq:a.eq,source:"çözücü"}));
+    assignments.push(...mesaiAssignments(db,M,built.staff));/* 3.5.0: hafta sonu mesaisi fiilî günleriyle */
     assignments.sort((a,b)=>a.date.localeCompare(b.date)||a.category.localeCompare(b.category,"tr")||a.name.localeCompare(b.name,"tr"));
     const audit=A.audit(db,M,assignments,{nextFirstDuties:nextMonthFirstDuties(db,M.month)});
     const post=sol.status==="infeasible"?{issues:[],postedDiff:null,overBound:null}:postNotes(db,M,built,assignments,sol);
@@ -673,7 +680,7 @@
     const S=M.settings||{};const g=db.global;
     /* generatedAt = çizelgenin hesaplandığı an (içe alırken geçen ayın planının zamanı olarak kullanılır; aynı çizelge aynı veriyi üretir) */
     return{format:CARRY_FORMAT,v:CARRY_V,app:C.VERSION,month,generatedAt:(r&&r.generatedAt)||new Date().toISOString(),status:r?r.status:null,stale:!!(r&&r.stale),
-      plan:(r&&r.assignments||[]).map(a=>({name:nm(a.pid),date:a.date,category:a.category})),posted,
+      plan:(r&&r.assignments||[]).filter(a=>a.kind!=="mesai").map(a=>({name:nm(a.pid),date:a.date,category:a.category})),posted,/* mesai sonraki ayın ay sınırını etkilemez */
       settings:{emergencyCap:S.emergencyCap,emergencyMin:S.emergencyMin,serviceMin:S.serviceMin,serviceMax:S.serviceMax,mode:S.mode,approvedBy:S.approvedBy,safeBoundary:S.safeBoundary,respectCurrentProbelNsi:S.respectCurrentProbelNsi,keepPosted:S.keepPosted,specialDays:S.specialDays,holidays:(S.holidays||[]).map(h=>({...h}))},
       leaves:(M.leaves||[]).filter(l=>okDate(l.start)&&okDate(l.end)&&l.end>last).map(l=>({name:nm(l.pid),start:l.start,end:l.end,kind:l.kind,note:l.note||""})),
       unavailable:(M.unavailable||[]).filter(u=>okDate(u.start)&&okDate(u.end)&&u.end>last).map(u=>({name:nm(u.pid),start:u.start,end:u.end,mode:u.mode,note:u.note||""})),
@@ -809,7 +816,7 @@
     db.activeMonth=old.activeMonth||Object.keys(db.months)[0]||null;return db;
   }
 
-  return{DB_VERSION,BOUNDARY_FMS,isWorkday,boundaryInfo,boundaryAdj,officialEqOf,defaultGlobal,newDb,newMonth,ensureMonth,log,resolve,ensurePerson,personName,confirmAlias,rejectAlias,isRejected,aliasSuggestions,
+  return{DB_VERSION,isWeekendMesaiOnly,mesaiAssignments,BOUNDARY_FMS,isWorkday,boundaryInfo,boundaryAdj,officialEqOf,defaultGlobal,newDb,newMonth,ensureMonth,log,resolve,ensurePerson,personName,confirmAlias,rejectAlias,isRejected,aliasSuggestions,
     setActualImport,confirmActualImport,setProbel,probelSignature,actualRows,staffSummary,priorStatus,boundaryBlocks,personBlocks,dailyLimits,preflight,buildProblem,run,manualEdit,pendingManualEdits,reaudit,
     ledgerBalances,openBalance,addLedger,reconcile,postedOfficial,officialForMonth,pullPriorFromPrevious,priorSignature,inputSignature,monthInputSignature,checkStale,carryToNext,carryForwardBasics,nextMonthFirstDuties,stdFms,dayTypeOf,
     newStarterInfo,newStarterFlags,postedDiff,staffingNotes,overBound,INPUT_SIG_V,PRIOR_MANUAL_LABEL,inMonthDate,misplacedActual,recordListModel,LEGACY_ORIGINS,dropLegacyPrior,dropLegacyCurrent,validateDb,validateCarry,priorDayCounts,repairDb,okDate,MONTH_RE,

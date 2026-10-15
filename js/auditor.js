@@ -129,22 +129,29 @@
       if(!a.cat){out.push(issue("error","CATEGORY_INVALID",`${nm} ${C.fmtDate(a.date)}: kategori '${a.category}' Servis veya Acil değil.`));continue;}
       (byPerson.get(a.pid)||byPerson.set(a.pid,[]).get(a.pid)).push(a);
       const k=`${a.pid}|${a.date}`;if(pd.has(k))out.push(issue("error","DUPLICATE_PERSON_DAY",`${nm} ${C.fmtDate(a.date)}: aynı kişi aynı gün birden fazla resmî görev.`));pd.add(k);
-      day[a.date][a.cat].add(a.pid);day[a.date].tasks[a.cat]++;
-      const f=fmsOfDate(db,M,a.date);
-      if(f==null)out.push(issue("error","FMS_DATE_UNVERIFIED",`${nm} ${C.fmtDate(a.date)}: bu günün FMS değeri onaylı değil (resmî tatil?).`));
+      if(a.kind!=="mesai"){day[a.date][a.cat].add(a.pid);day[a.date].tasks[a.cat]++;}/* hafta sonu mesaisi nöbet kadrosuna sayılmaz */
+      /* 3.5.0 hafta sonu mesaisi: yalnız hiç nöbeti olmayan kişinin fiilî hafta sonu/tatil gündüz mesaisi günü; değer tablo “daytime” (motordan bağımsız) */
+      if(a.kind==="mesai"){const off=d=>{const w=dow(d);if(w===0||w===6)return true;const h=(M.settings.holidays||[]).find(x=>x.date===d);return!!h&&h.kind!=="yarım gün";};
+        const fr=(M.actual||[]).filter(r=>r.status!=="ignored"&&pidOf(db,r.rawName)===a.pid&&String(r.date).startsWith(month));
+        if(!fr.some(r=>r.date===a.date&&r.shift&&shiftKind(r.shift)==="day"&&off(a.date)))out.push(issue("error","MESAI_INVALID",`${nm} ${C.fmtDate(a.date)}: hafta sonu mesaisi yazılmış ama fiilî listede o gün hafta sonu/tatil gündüz mesaisi yok.`));
+        if(fr.some(r=>!(r.shift&&shiftKind(r.shift)==="day"&&off(r.date))))out.push(issue("error","MESAI_MIXED",`${nm}: fiilî listede nöbeti de var; hafta sonu mesaisi resmî listeye yalnız hiç nöbeti olmayan kişide mesai olarak yazılır.`));
+        const fd=tab(db,"daytime");if(C.num(a.fms)!==fd)out.push(issue("error","FMS_MISMATCH",`${nm} ${C.fmtDate(a.date)}: mesai FMS ${a.fms}, kural ${fd}.`));
+        if(a.eq!=null&&Math.abs(C.num(a.eq)-fd*fac[a.cat])>0.001)out.push(issue("error","EQ_MISMATCH",`${nm} ${C.fmtDate(a.date)}: eşdeğer saat ${a.eq}, olması gereken ${fd*fac[a.cat]}.`));}
+      const f=a.kind==="mesai"?tab(db,"daytime"):fmsOfDate(db,M,a.date);
+      if(a.kind==="mesai"){}else if(f==null)out.push(issue("error","FMS_DATE_UNVERIFIED",`${nm} ${C.fmtDate(a.date)}: bu günün FMS değeri onaylı değil (resmî tatil?).`));
       else if(C.num(a.fms)!==f)out.push(issue("error","FMS_MISMATCH",`${nm} ${C.fmtDate(a.date)}: görev FMS ${a.fms}, kural tablosu ${f}.`));
-      if(f!=null&&a.eq!=null&&Math.abs(C.num(a.eq)-f*fac[a.cat])>0.001)out.push(issue("error","EQ_MISMATCH",`${nm} ${C.fmtDate(a.date)}: eşdeğer saat ${a.eq}, olması gereken ${f*fac[a.cat]}.`));
+      if(a.kind!=="mesai"&&f!=null&&a.eq!=null&&Math.abs(C.num(a.eq)-f*fac[a.cat])>0.001)out.push(issue("error","EQ_MISMATCH",`${nm} ${C.fmtDate(a.date)}: eşdeğer saat ${a.eq}, olması gereken ${f*fac[a.cat]}.`));
       if((M.exclusions||[]).includes(a.pid))out.push(issue("error","EXCLUDED",`${nm}: bu ay hariç tutulan personel, ${C.fmtDate(a.date)} görev yazılmış.`));
       for(const l of M.leaves||[])if(l.pid===a.pid&&a.date>=l.start&&a.date<=l.end)out.push(issue("error","ON_LEAVE",`${nm} ${C.fmtDate(a.date)}: ${l.kind||"izin"} (${C.fmtDate(l.start)}–${C.fmtDate(l.end)}) içinde.`));
       for(const u of M.unavailable||[])if(u.pid===a.pid&&u.mode==="blocked"&&a.date>=u.start&&a.date<=u.end)out.push(issue("error","UNAVAILABLE",`${nm} ${C.fmtDate(a.date)}: kesin müsait değil olarak işaretli.`));
       const only=(M.unavailable||[]).filter(u=>u.pid===a.pid&&u.mode==="only");if(only.length&&!only.some(u=>a.date>=u.start&&a.date<=u.end))out.push(issue("error","UNAVAILABLE",`${nm} ${C.fmtDate(a.date)}: yalnız belirtilen aralıklarda müsait.`));
       const st=M.staff?.[a.pid]||{};if(st.startDate&&a.date<st.startDate)out.push(issue("error","NOT_STARTED",`${nm} ${C.fmtDate(a.date)}: görev başlangıcı ${C.fmtDate(st.startDate)}.`));if(st.endDate&&a.date>st.endDate)out.push(issue("error","ENDED",`${nm} ${C.fmtDate(a.date)}: görev bitişi ${C.fmtDate(st.endDate)}.`));
-      for(const b of bnd.get(a.pid)||[])if(b.date===a.date)out.push(issue("error","BOUNDARY",`${nm} ${C.fmtDate(a.date)}: ${b.why} — iki tam gün dinlenme sağlanmıyor.`));
+      for(const b of bnd.get(a.pid)||[])if(b.date===a.date&&a.kind!=="mesai")out.push(issue("error","BOUNDARY",`${nm} ${C.fmtDate(a.date)}: ${b.why} — iki tam gün dinlenme sağlanmıyor.`));
       for(const cat of["Servis","Acil"]){const src=M.currentOfficial?.[cat];if(!src)continue;for(const p of src.persons||[]){if(pidOf(db,p.name)!==a.pid)continue;for(const b of p.blocks||[])if(b.date===a.date)out.push(issue("error","PROBEL_LEAVE",`${nm} ${C.fmtDate(a.date)}: bu ayın PROBEL kaydında '${b.label}'.`));if(s.respectCurrentProbelNsi!==false&&(p.nsi||[]).includes(a.date))out.push(issue("error","PROBEL_NSI",`${nm} ${C.fmtDate(a.date)}: bu ayın PROBEL kaydında NSİ (nöbet ertesi izin) günü.`));}}
     }
     for(const[pid,arr]of byPerson){
       const nm=arr[0].name||db.people?.[pid]?.name||pid;
-      const ds=C.uniq(arr.map(a=>a.date)).sort();
+      const ds=C.uniq(arr.filter(a=>a.kind!=="mesai").map(a=>a.date)).sort();/* gün sayısı ve dinlenme yalnız nöbet */
       if(ds.length>(db.global.maxDutyDays||8))out.push(issue("error","MAX_DAYS",`${nm}: ${ds.length} farklı resmî nöbet günü; kesin üst sınır ${db.global.maxDutyDays||8}.`));
       for(let i=1;i<ds.length;i++){const g=C.dateDiff(ds[i-1],ds[i]);if(g<(db.global.minGapDays||3))out.push(issue("error","REST",`${nm}: ${C.fmtDate(ds[i-1])} → ${C.fmtDate(ds[i])} arasında yalnız ${Math.max(0,g-1)} tam boş gün (en az 2 gerekli).`));}
       const cats=C.uniq(arr.map(a=>a.cat));
@@ -156,10 +163,10 @@
       }
       if(!e||!(e.target>0))out.push(issue("error","UNWORKED",`${nm}: bu ay fiilî hakedişi yok/0; resmî nöbet yazılması çalışılmamış nöbeti ücretli göstermek olur.`));
       const off=d=>(M.leaves||[]).some(l=>l.pid===pid&&d>=l.start&&d<=l.end)||(()=>{const q=M.staff?.[pid]||{};return!!((q.startDate&&d<q.startDate)||(q.endDate&&d>q.endDate));})();
-      const bPlus=lastPlus&&arr.some(a=>a.date===mLast)?lastPlus:0;const bMinus=firstMinus&&priorLastSet.has(pid)&&!off(mFirst)?firstMinus:0;
+      const bPlus=lastPlus&&arr.some(a=>a.date===mLast&&a.kind!=="mesai")?lastPlus:0;const bMinus=firstMinus&&priorLastSet.has(pid)&&!off(mFirst)?firstMinus:0;
       /* NSİ kişinin çalışmadığı iş gününe düşerse PROBEL o günü gereken saatten saymaz: +8 */
-      const bLeave=8*C.uniq(arr.map(a=>a.date)).filter(d=>d<mLast&&!off(d)&&workday(db,C.addDays(d,1))&&off(C.addDays(d,1))).length;
-      const official=arr.reduce((z,a)=>z+(fmsOfDate(db,M,a.date)||0)*(fac[a.cat]||0),0)+(bPlus-bMinus+bLeave)*(fac[cats[0]]||0);/* PROBEL'in aylık FMS'i */
+      const bLeave=8*C.uniq(arr.filter(a=>a.kind!=="mesai").map(a=>a.date)).filter(d=>d<mLast&&!off(d)&&workday(db,C.addDays(d,1))&&off(C.addDays(d,1))).length;
+      const official=arr.reduce((z,a)=>z+(a.kind==="mesai"?tab(db,"daytime"):(fmsOfDate(db,M,a.date)||0))*(fac[a.cat]||0),0)+(bPlus-bMinus+bLeave)*(fac[cats[0]]||0);/* PROBEL'in aylık FMS'i */
       if(e&&e.target!=null){
         const settle=M.staff?.[pid]?.settlePrior?openOf(M,pid):0;
         const need=e.target+settle;const short=C.round2(need-official);
