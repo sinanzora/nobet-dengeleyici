@@ -32,6 +32,29 @@
   function notify(msg,error=false,ms=6000){const n=$("#notice");n.innerHTML=esc(msg);n.className=`notice${error?" error":""}`;clearTimeout(n._t);n._t=setTimeout(()=>n.classList.add("hidden"),ms);}
   function download(bytes,name,type){const blob=bytes instanceof Blob?bytes:new Blob([bytes],{type:type||"application/octet-stream"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000);}
   const FMS_RULE_LABEL={halfday:"Arefe nöbeti (hafta içi)",daytime:"Gündüz mesaisi (Cts/Paz/tatil)"};
+  /* 3.3.1 (kullanıcı isteği 15.10.2026): tarih aralığı TEK KUTUDA — önce başlangıç, sonra bitiş günü seçilir, arası işaretlenir (aynı güne iki kez = tek gün).
+     Seçim gizli #lvStart/#lvEnd alanlarına yazılır; tarih denetimi ve kayıt “leave-add” içinde aynen kalır. */
+  const RG={view:null};
+  function rgFmt(a,b){const p=d=>({d:+d.slice(8),m:+d.slice(5,7),y:+d.slice(0,4)}),N=C.MONTHS_TR;const x=p(a);if(!b||b===a)return`${x.d} ${N[x.m-1]} ${x.y}`;const y=p(b);
+    if(x.y===y.y&&x.m===y.m)return`${x.d}–${y.d} ${N[x.m-1]} ${x.y}`;if(x.y===y.y)return`${x.d} ${N[x.m-1]} – ${y.d} ${N[y.m-1]} ${x.y}`;return`${x.d} ${N[x.m-1]} ${x.y} – ${y.d} ${N[y.m-1]} ${y.y}`;}
+  function rgSync(){const b=$("#lvRange");if(!b)return;const s=$("#lvStart").value,e=$("#lvEnd").value;const ok=d=>C.isYmd(d);
+    b.textContent=ok(s)&&ok(e)?rgFmt(s,e):ok(s)?`${rgFmt(s)} → bitişi seçin`:ok(e)?`başlangıcı seçin → ${rgFmt(e)}`:"Tarih seçin";b.classList.toggle("empty",!(ok(s)&&ok(e)));}
+  function rgOpen(){const pop=$("#lvRangePop");if(!pop)return;const s=$("#lvStart").value,e=$("#lvEnd").value;RG.view=(C.isYmd(s)?s:C.isYmd(e)?e:M().month+"-01").slice(0,7);pop.hidden=false;$("#lvRange").setAttribute("aria-expanded","true");rgRender();}
+  function rgClose(){const pop=$("#lvRangePop");if(pop)pop.hidden=true;const b=$("#lvRange");if(b)b.setAttribute("aria-expanded","false");}
+  function rgRender(){const pop=$("#lvRangePop");if(!pop||pop.hidden)return;const days=C.monthDates(RG.view);const s=$("#lvStart").value,e=$("#lvEnd").value;
+    const cells=[];for(let i=0;i<(C.weekday(days[0])+6)%7;i++)cells.push('<span class="rg-empty"></span>');
+    for(const d of days){const cls=["rg-day",d===s?"rg-start":"",d===e?"rg-end":"",C.isYmd(s)&&C.isYmd(e)&&d>s&&d<e?"rg-in":"",[0,6].includes(C.weekday(d))?"rg-we":""].filter(Boolean).join(" ");
+      cells.push(`<button type="button" class="${cls}" data-action="range-day" data-date="${d}" aria-label="${fd(d)} ${C.dayName(d)}" aria-pressed="${d===s||d===e}">${+d.slice(8)}</button>`);}
+    const n=C.isYmd(s)&&C.isYmd(e)?C.dateDiff(s,e)+1:0;
+    pop.innerHTML=`<div class="rg-head"><button type="button" class="icon-btn" data-action="range-prev" aria-label="Önceki ay">‹</button><b>${esc(C.monthLabel(RG.view))}</b><button type="button" class="icon-btn" data-action="range-next" aria-label="Sonraki ay">›</button></div>
+      <div class="rg-grid">${["Pzt","Sal","Çar","Per","Cum","Cmt","Paz"].map(x=>`<span class="rg-dow">${x}</span>`).join("")}${cells.join("")}</div>
+      <div class="rg-foot"><span class="muted" id="lvRangeInfo">${n?`${esc(rgFmt(s,e))} · ${n} gün`:C.isYmd(s)?"Bitiş gününe dokunun (tek gün için aynı güne tekrar)":"Başlangıç gününe dokunun"}</span><span class="rg-btns"><button type="button" class="ghost" data-action="range-clear">Temizle</button><button type="button" class="soft" data-action="range-close">Tamam</button></span></div>`;}
+  function rgPick(d){const S=$("#lvStart"),F=$("#lvEnd");const s=S.value,e=F.value;
+    if(!C.isYmd(s)&&C.isYmd(e)&&d<=e)S.value=d;            /* bitiş hazırdı (ör. İşten ayrıldı): başlangıç seçildi */
+    else if(!C.isYmd(s)||C.isYmd(e)){S.value=d;F.value="";} /* yeni seçim */
+    else if(d<s)S.value=d;                                    /* başlangıçtan önceki gün: yeni başlangıç */
+    else F.value=d;                                           /* bitiş (aynı gün = tek gün) */
+    rgSync();rgRender();if(C.isYmd(S.value)&&C.isYmd(F.value))setTimeout(rgClose,350);}
   function todayMonth(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;}
 
   /* ---------------- diyalog ---------------- */
@@ -186,7 +209,7 @@
         <td><select data-staff="paymentStatus" data-pid="${esc(s.pid)}">${opt("",st.paymentStatus,"Ödeme durumu bilinmiyor")}${opt("unpaid",st.paymentStatus,"Doğrulandı: ödenmedi")}${opt("paid",st.paymentStatus,"Doğrulandı: ödendi")}</select><br><label class="small"><input type="checkbox" data-staff="deferApproved" data-pid="${esc(s.pid)}" ${st.deferApproved?"checked":""}> sonraki aya devret</label>${s.openBalance?`<br><label class="small"><input type="checkbox" data-staff="settlePrior" data-pid="${esc(s.pid)}" ${st.settlePrior?"checked":""}> açık devri (${fmt(s.openBalance)}) bu ay kapat</label>`:""}</td>
 </tr>`;}).join("")}</tbody>`;
     const people=E.staffSummary(db,m);
-    $("#leaveEditor").innerHTML=`<label>Personel<select id="lvPerson">${people.map(s=>`<option value="${esc(s.pid)}">${esc(s.name)}</option>`).join("")}</select></label><label>Tür<select id="lvKind"><optgroup label="İzin — çalışmadığı günler (nöbet yazılmaz)">${E.LEAVE_REASONS.map(r=>`<option value="leave:${esc(r)}">${esc(r)}</option>`).join("")}</optgroup><optgroup label="Nöbet tercihi (izin değil)"><option value="un:avoid">Nöbet istemiyor (tercih)</option><option value="un:prefer">Nöbet istiyor (tercih)</option><option value="un:only">Yalnız bu aralıkta müsait</option></optgroup></select></label><label>Başlangıç<input type="date" id="lvStart"></label><label>Bitiş<input type="date" id="lvEnd"></label><label>Not<input id="lvNote" placeholder="isteğe bağlı"></label><button class="soft" type="button" data-action="leave-add">Ekle</button>`;
+    $("#leaveEditor").innerHTML=`<label>Personel<select id="lvPerson">${people.map(s=>`<option value="${esc(s.pid)}">${esc(s.name)}</option>`).join("")}</select></label><label>Tür<select id="lvKind"><optgroup label="İzin — çalışmadığı günler (nöbet yazılmaz)">${E.LEAVE_REASONS.map(r=>`<option value="leave:${esc(r)}">${esc(r)}</option>`).join("")}</optgroup><optgroup label="Nöbet tercihi (izin değil)"><option value="un:avoid">Nöbet istemiyor (tercih)</option><option value="un:prefer">Nöbet istiyor (tercih)</option><option value="un:only">Yalnız bu aralıkta müsait</option></optgroup></select></label><div class="range-wrap"><span class="range-label">Tarih aralığı</span><button type="button" class="range-field empty" id="lvRange" data-action="range-open" aria-haspopup="dialog" aria-expanded="false">Tarih seçin</button><input type="hidden" id="lvStart"><input type="hidden" id="lvEnd"><div class="range-pop" id="lvRangePop" role="dialog" aria-label="İzin tarih aralığı" hidden></div></div><label>Not<input id="lvNote" placeholder="isteğe bağlı"></label><button class="soft" type="button" data-action="leave-add">Ekle</button>`;
     const kindTR={blocked:"kesin müsait değil (izin)",avoid:"nöbet istemiyor (tercih)",prefer:"nöbet istiyor (tercih)",only:"yalnız bu aralıkta müsait"};
     /* eski kayıtlardaki başlama/ayrılış tarihleri de izin listesinde gösterilir (tek yer) */
     const md=C.monthDates(m.month);const legacy=Object.entries(m.staff||{}).flatMap(([pid,st])=>[...(st.startDate&&st.startDate>md[0]?[{pid,kind:"Henüz başlamadı",start:md[0],end:C.addDays(st.startDate,-1),field:"startDate"}]:[]),...(st.endDate&&st.endDate<md[md.length-1]?[{pid,kind:"İşten ayrıldı",start:C.addDays(st.endDate,1),end:md[md.length-1],field:"endDate"}]:[])]);
@@ -333,6 +356,7 @@
       const g=e.target.closest("[data-goto]");if(g){showStep(g.dataset.goto);return;}
       const t=e.target.closest("[data-tab]");if(t&&t.closest(".subtabs")){tab=t.dataset.tab;renderStep4();return;}
       if(!e.target.closest(".menu"))$("#dataMenu").hidden=true;
+      {const pop=$("#lvRangePop");if(pop&&!pop.hidden&&!e.target.closest("#lvRangePop,#lvRange"))rgClose();}
       const b=e.target.closest("[data-action]");if(!b||b.tagName==="SELECT")return;const a=b.dataset.action;const m=M();
       try{
       if(a==="pick-actual")$("#actualInput").click();
@@ -358,6 +382,11 @@
           if(ka)E.confirmAlias(db,s.b,s.a,"kullanıcı");else E.confirmAlias(db,s.a,s.b,"kullanıcı");save("ISIM_AYNI",`${s.a} = ${s.b}`);}
         if(m.result)m.result.stale=true;E.checkStale(db);render();}
       else if(a==="legacy-del"){const st=m.staff[b.dataset.pid];if(st){delete st[b.dataset.field];if(m.result)m.result.stale=true;save("IZIN_SIL",`${E.personName(db,b.dataset.pid)} ${b.dataset.field}`);renderStep2();renderDots();}}
+      else if(a==="range-open"){const pop=$("#lvRangePop");if(pop&&!pop.hidden)rgClose();else rgOpen();}
+      else if(a==="range-prev"||a==="range-next"){const[y,mm]=RG.view.split("-").map(Number);RG.view=new Date(Date.UTC(y,mm-1+(a==="range-next"?1:-1),1)).toISOString().slice(0,7);rgRender();}
+      else if(a==="range-day")rgPick(b.dataset.date);
+      else if(a==="range-clear"){$("#lvStart").value="";$("#lvEnd").value="";rgSync();rgRender();}
+      else if(a==="range-close")rgClose();
       else if(a==="leave-add"){const pid=$("#lvPerson").value,kind=$("#lvKind").value,start=$("#lvStart").value,end=$("#lvEnd").value||$("#lvStart").value;if(!pid||!start)return notify("Personel ve başlangıç tarihi gerekli.",true);if(!E.okDate(start)||!E.okDate(end))return notify("Tarih geçersiz (ör. yıl beş haneli yazılmış). Tarihi gg.aa.yyyy olarak yeniden seçin.",true);if(end<start)return notify("Bitiş başlangıçtan önce olamaz.",true);const[t,k]=kind.split(":");if(t==="leave")m.leaves.push({id:C.uid("izin"),pid,start,end,kind:k,source:"kullanıcı",note:$("#lvNote").value});else m.unavailable.push({id:C.uid("uygun"),pid,start,end,mode:k,note:$("#lvNote").value});if(m.result)m.result.stale=true;save("IZIN_EKLE",`${E.personName(db,pid)} ${k} ${start}–${end}`);renderStep2();renderDots();}
       else if(a==="leave-del"){m.leaves=m.leaves.filter(x=>x.id!==b.dataset.id);if(m.result)m.result.stale=true;save("IZIN_SIL","");renderStep2();}
       else if(a==="un-del"){m.unavailable=m.unavailable.filter(x=>x.id!==b.dataset.id);if(m.result)m.result.stale=true;save("UYGUNLUK_SIL","");renderStep2();}
@@ -405,6 +434,7 @@
       else if(a==="reset-month"){const v=await dialog("Bu ayı sıfırla",`<p><b>${esc(C.monthLabel(m.month))}</b> ayının tüm verileri (içe aktarma, ayarlar, çizelge, defter) silinecek. Önce yedek almanız önerilir. Diğer aylar etkilenmez.</p><label class="check"><input type="checkbox" name="sure"> Evet, bu ayı sıfırla</label>`,{ok:"Sıfırla"});if(v&&v.sure){delete db.months[m.month];E.ensureMonth(db,m.month);save("AY_SIFIRLANDI","");render();notify("Ay sıfırlandı.");}}
       }catch(err){console.error(err);notify(err.message,true,12000);}
     });
+    document.addEventListener("keydown",e=>{if(e.key==="Escape")rgClose();});
     document.addEventListener("input",e=>{if(e.target.id==="pmSearch"){pmFilter=e.target.value;pmApplyFilter();}});
     document.addEventListener("change",async e=>{
       const x=e.target;const m=M();
@@ -433,7 +463,7 @@
         if(["emergencyCap","emergencyMin","serviceMin","serviceMax"].includes(k))s[k]=C.num(x.value);
         else if(k==="mode")s.mode=x.value;else if(x.type==="checkbox")s[k]=x.checked;else s[k]=x.value;
         rulesChanged(`${k}=${x.type==="checkbox"?x.checked:x.value}`);return;}
-      if(x.id==="lvKind"){const md=C.monthDates(m.month);if(x.value==="leave:Henüz başlamadı"){$("#lvStart").value=md[0];if(!$("#lvEnd").value)$("#lvEnd").focus();}else if(x.value==="leave:İşten ayrıldı"){$("#lvEnd").value=md[md.length-1];if(!$("#lvStart").value)$("#lvStart").focus();}return;}
+      if(x.id==="lvKind"){const md=C.monthDates(m.month);if(x.value==="leave:Henüz başlamadı"){$("#lvStart").value=md[0];if(C.isYmd($("#lvEnd").value)&&$("#lvEnd").value<md[0])$("#lvEnd").value="";rgSync();if(!$("#lvEnd").value)rgOpen();}else if(x.value==="leave:İşten ayrıldı"){$("#lvEnd").value=md[md.length-1];if(C.isYmd($("#lvStart").value)&&$("#lvStart").value>md[md.length-1])$("#lvStart").value="";rgSync();if(!$("#lvStart").value)rgOpen();}return;}
       if(x.dataset.special){E.setSpecialDayAnswer(db,m.month,x.dataset.special,x.value==="var");rulesChanged(`özel gün sorusu ${x.dataset.special}=${x.value}`);return;}
       if(x.dataset.hol){const h=m.settings.holidays[+x.dataset.i];if(x.dataset.hol==="fms")h.fms=C.num(x.value);else{if(x.checked&&C.num(h.fms)==null){x.checked=false;return notify("Önce FMS değerini girin.",true);}h.confirmed=x.checked;}rulesChanged(`tatil ${h.date}`);return;}
       if(x.dataset.shift){const r=db.global.specialShiftRules[+x.dataset.i];r.fms[x.dataset.shift]=C.num(x.value);r.note="kullanıcı girdi";rulesChanged(`vardiya ${r.start}-${r.end} ${x.dataset.shift}=${x.value}`);return;}

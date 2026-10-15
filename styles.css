@@ -142,3 +142,13 @@ dialog::backdrop{background:rgba(18,61,58,.35)}
 #pmSearch{width:100%;max-width:340px;margin:8px 0}.pm-days{display:grid;grid-template-columns:1fr 1fr;gap:14px}.pm-day>b{display:block;margin-bottom:4px}
 .pm-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:2px 12px}.pm-item{display:flex;align-items:center;gap:6px;font-size:13px;padding:3px 0;cursor:pointer}.pm-item[hidden]{display:none}
 @media (max-width:760px){.pm-days{grid-template-columns:1fr}.pm-item{padding:6px 0}.pm-item input{width:20px;height:20px}}
+
+/* 3.3.1 — tek kutuda tarih aralığı seçici */
+.range-wrap{position:relative;display:flex;flex-direction:column;gap:4px;grid-column:span 2;min-width:0}.range-label{font-size:12px;color:var(--muted)}
+.range-field{min-height:38px;width:100%;text-align:left;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}.range-field.empty{color:var(--muted);font-weight:400}
+.range-pop{position:absolute;top:100%;left:0;z-index:40;margin-top:6px;width:min(330px,calc(100vw - 32px));background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.16);padding:10px}
+.rg-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}.rg-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}.rg-dow{font-size:11px;text-align:center;color:var(--muted);padding:2px 0}
+.rg-day{height:36px;border:0;border-radius:8px;background:transparent;color:var(--ink);font:inherit;cursor:pointer}.rg-day:hover{background:var(--mint)}.rg-we{color:var(--amber)}
+.rg-in{background:var(--mint);border-radius:0}.rg-start,.rg-end{background:var(--green)!important;color:#fff!important}.rg-start{border-radius:8px 0 0 8px}.rg-end{border-radius:0 8px 8px 0}.rg-start.rg-end{border-radius:8px}
+.rg-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;font-size:12px}.rg-btns{display:flex;gap:6px}
+@media (max-width:760px),(pointer:coarse){.range-wrap{grid-column:1/-1}.rg-day{height:42px}.range-pop{position:fixed;left:16px;right:16px;top:auto;bottom:16px;width:auto}}
