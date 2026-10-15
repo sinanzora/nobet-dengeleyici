@@ -302,7 +302,7 @@
           for(const s of staffList||[]){const sim=C.nameSimilarity(p.name,s.name);if(sim&&sim.kind!=="same"&&!isRejected(db,p.name,s.name)){targets.push(s.pid);pendingMatches.push({probelName:p.name,candidate:s.name,candidatePid:s.pid,reason:sim.reason,cat});}}
         }
         for(const d of p.duties){if(!last3.has(d.date))continue;for(const t of targets){const pending=t!==pid;add(t,C.addDays(d.date,1),`${C.fmtDate(d.date)} resmî ${cat} nöbeti (${src.origin==="app-plan"?"uygulama planı":"PROBEL"})${pending?" — isim eşleşmesi onay bekliyor":""}`,pending?"güvenli":"kesin",cat);add(t,C.addDays(d.date,2),`${C.fmtDate(d.date)} resmî ${cat} nöbeti + 2 tam gün dinlenme${pending?" — isim eşleşmesi onay bekliyor":""}`,pending?"güvenli":"kesin",cat);}}
-        if(M.settings.safeBoundary)for(const md of p.boundaryMissing||[]){if(manualNone.has(`${pid}|${md}`))continue;for(const t of targets){add(t,C.addDays(md,1),`${C.fmtDate(md)} PROBEL hücresi eksik/belirsiz — teyit bekleniyor`,"güvenli",cat);add(t,C.addDays(md,2),`${C.fmtDate(md)} PROBEL hücresi eksik/belirsiz — teyit bekleniyor`,"güvenli",cat);}}
+        /* 3.3.0: güvenli mod kaldırıldı — eksik/belirsiz PROBEL hücresi engel koymaz; bağımsız denetçi BOUNDARY_UNCERTAIN uyarısı verir */
       }
     }
     for(const x of M.priorManual){if(x.kind!=="duty")continue;known.add(x.pid);add(x.pid,C.addDays(x.date,1),`${C.fmtDate(x.date)} resmî nöbet (elle girildi)`,"kesin","elle");add(x.pid,C.addDays(x.date,2),`${C.fmtDate(x.date)} resmî nöbet + 2 tam gün (elle girildi)`,"kesin","elle");
@@ -315,8 +315,8 @@
     if(nx)for(const cat of["Servis","Acil"])for(const p of(nx[cat]?.persons||[])){const pid=resolve(db,p.name);for(const d of p.duties||[]){const dd=C.dateDiff(C.monthDates(C.nextMonth(month))[0],d.date);if(dd>1)continue;for(let k=1;k<=2;k++){const back=C.addDays(d.date,-k);add(pid,back,`${C.fmtDate(d.date)} sonraki ay resmî ${cat} nöbeti — arada 2 tam gün kalmalı`,"kesin","sonraki ay");}}}
     const st=priorStatus(db,M);
     const unknown=[];
-    if(!st.complete&&M.settings.safeBoundary){for(const s of staffList||[]){if(known.has(s.pid))continue;unknown.push(s.pid);for(const d of first)add(s.pid,d,"Önceki ayın resmî kaydı yüklenmedi — güvenli mod (teyit edilene kadar)","güvenli","eksik veri");}}
-    else if(!st.complete){for(const s of staffList||[])if(!known.has(s.pid))unknown.push(s.pid);}
+    /* 3.3.0 (kullanıcı isteği): güvenli mod kaldırıldı — ay sonu onaylanmadıysa ilk 2 gün kapatılmaz; durum “eksik veri”, uyarı verilir */
+    if(!st.complete){for(const s of staffList||[])if(!known.has(s.pid))unknown.push(s.pid);}
     return{blocks,known,unknown,pendingMatches,status:st};
   }
 
@@ -410,7 +410,6 @@
     const impErr=(M.actualSource?.issues||[]).filter(i=>i.level==="error");
     if(impErr.length&&!M.actualSource.errorsAcknowledged)e("IMPORT_HAS_ERRORS",`Fiilî liste içe aktarımında ${impErr.length} hata var (${impErr.slice(0,2).map(i=>i.message).join(" · ")}). Dosyayı düzeltin veya hatalara rağmen açık onay verin.`);
     const s=M.settings;
-    if(!s.rulesConfirmed)e("RULES_UNCONFIRMED","Bu ayın kuralları (FMS tablosu, katsayılar, günlük sınırlar) onaylanmadı (Adım 3).");
     if(C.num(s.emergencyCap)==null)e("EMERGENCY_CAP_MISSING","Günlük Acil üst sınırı girilmedi.");
     if(C.num(s.emergencyMin)==null)e("EMERGENCY_MIN_MISSING","Günlük Acil asgari kadrosu girilmedi (0 da olabilir; klinik yönetimince belirlenmeli).");
     if(C.num(s.serviceMin)==null)e("SERVICE_MIN_MISSING","Günlük Servis asgari kadrosu girilmedi (0 da olabilir; klinik yönetimince belirlenmeli).");
@@ -483,10 +482,9 @@
     const issues=[...pre,...post.issues,...audit];
     let status,statusText;
     if(sol.status==="infeasible"){status="infeasible";statusText="Kanıtlı olarak çözüm yok — kesin kurallar bu verilerle sağlanamaz";
-      /* "o gün yazılabilecek 0 kişi" kanıtına NEDEN eklenir: o kategorideki kişilerin o günkü engelleri (güvenli mod, izin, ay sınırı…) */
+      /* "o gün yazılabilecek 0 kişi" kanıtına NEDEN eklenir: o kategorideki kişilerin o günkü engelleri (izin, ay sınırı…) */
       const why=p=>{if(p.kind!=="day"||!p.date)return"";const reasons=new Map();for(const q of built.problem.persons){if(!q.cats.includes(p.cat)||!(q.target>0))continue;const r=built.blockedMap[q.pid]&&built.blockedMap[q.pid].get(p.date);if(!r)continue;const k=String(r).replace(/\s*\([^)]*\)\s*$/,"");reasons.set(k,(reasons.get(k)||0)+1);}
-        const safe=[...reasons.keys()].some(k=>/güvenli mod/.test(k));
-        return reasons.size?` Nedenler: ${[...reasons.entries()].sort((a,b)=>b[1]-a[1]).map(([k,n])=>`${k} (${n} kişi)`).join("; ")}.${safe?" Çözüm: Adım 1 → ② bölümünde geçen ayın program çıktısını (Excel) yükleyin ya da son 2 günün resmî nöbetlerini elle girip “hepsi burada”yı işaretleyin. İlk ayınızsa ve geçen ay bilinmiyorsa güvenli modu kapatabilirsiniz; o zaman ay başında dinlenme kuralı doğrulanmamış olur.":""}`:"";};
+        return reasons.size?` Nedenler: ${[...reasons.entries()].sort((a,b)=>b[1]-a[1]).map(([k,n])=>`${k} (${n} kişi)`).join("; ")}.`:"";};
       issues.unshift(...sol.proof.map(p=>({level:"error",code:"INFEASIBLE_PROOF",message:p.message+why(p)})));assignments=[];}
     else if(sol.status!=="feasible"){status="not_found";statusText=`Süre sınırında (${Math.round((sol.stats?.timeLimitMs||0)/1000)} sn) tüm günlük sınırları sağlayan çözüm BULUNAMADI — bu imkânsızlık kanıtı değildir`;(sol.residual||[]).forEach(r=>issues.unshift({level:"error",code:"SOLVER_RESIDUAL",message:`${C.fmtDate(r.date)} ${r.cat}: ${r.type==="max"?"üst sınır":"asgari"} ${r.by} kişi ${r.type==="max"?"aşıldı":"eksik"} (en iyi deneme).`}));}
     else{const errs=issues.filter(x=>x.level==="error");const incomplete=issues.some(x=>x.incomplete);status=errs.length?"invalid":incomplete?"valid_incomplete":"valid_complete";statusText=errs.length?"Bağımsız denetimde REDDEDİLDİ":incomplete?"Kurallara uygun — ancak eksik veri var; TAM DENETLENDİ DEĞİL":"Geçerli — bağımsız denetimden geçti";}
@@ -552,7 +550,7 @@
       let decision="fark yok",carry=0;
       if(diff!=null&&diff>0.001){
         if(st.paymentStatus==="paid")decision="ödenmiş — devir yok";
-        else if(st.paymentStatus==="unpaid"&&st.deferApproved&&M.settings.approvedBy){decision="onaylı açık devir";carry=diff;}
+        else if(st.paymentStatus==="unpaid"&&st.deferApproved){decision="onaylı açık devir";carry=diff;}
         else decision="mutabakat bekliyor (ödeme durumu/onay eksik)";
       }else if(diff!=null&&diff<-0.001)decision="fazla ödeme planı (fark negatif)";
       return{pid:s.pid,name:s.name,excluded:s.excluded,actualDays:s.actualDays,servisFms:s.servisFms,acilFms:s.acilFms,earnedComputed:s.earnedComputed,earnedOverride:s.earnedOverride,earnedTarget:s.earnedTarget,

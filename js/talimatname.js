@@ -65,10 +65,8 @@
       ["“Bu ay resmî tatil var mı?”","cevapsız","<b>Her ay sorulur</b>; Evet ise günler ve her günün FMS'i girilip onaylanır"],
       ["“Bu ay yarım gün çalışma var mı?” (ör. bayram arifesi)","cevapsız","<b>Her ay sorulur</b>; Evet ise günler girilir. Nöbet FMS'i sorulmaz (yetkili kuralı, bölüm 1); hafta içi arefede özel vardiyaların yarım gün FMS'i ayrıca istenir"],
       ["Geçen ayın son 2 günündeki resmî nöbetler","girilmedi","Geçen ayın program çıktısı Excel'inden gelir ya da elle girilir; “hepsi burada” onayıyla tam sayılır (bölüm 4)"],
-      ["Güvenli mod",d.monthDefaults.safeBoundary?"AÇIK":"kapalı","Geçen ayın son 2 günü onaylanmadıysa ay sonu bilinmeyen kişilere ayın ilk 2 günü nöbet yazılmaz"],
       ["Hakediş modu",d.monthDefaults.mode==="strict"?"Devirsiz":"Onaylı devir","Devirsiz: resmî karşılık fiilî hakedişten az olamaz. Onaylı devir: eksik kalan fark yetkili onayıyla sonraki aya devredilebilir"],
       ["Başlangıç kontrol edildi (kişi)","—","Oryantasyonla başlayan ya da geçen ayın fiilî listesinde olmayan kişi için “yeni mi başladı?” uyarısını kapatır; yeni başladıysa bunun yerine “Henüz başlamadı” izni girilir. Program başlama tarihini tahmin etmez"],
-      ["Kural onayı","onaysız","Yukarıdakiler girilip “onaylıyorum” işaretlenmeden çizelge üretilmez; kural değişince onay kalkar"],
       ["İzin = personelin ÇALIŞMADIĞI her gün","—",`Sebepler (yalnız bilgi; hepsi aynı işlenir, o günlerde resmî nöbet yazılmaz): ${(d.leaveReasons||[]).map(esc).join(", ")}. İşten ayrılış: ayrıldığı günden ay sonuna; henüz başlamadı: ay başından başladığı güne kadar girilir. Ay sınırını aşan izin sonraki aya taşınır. İzinli günde fiilî nöbet varsa uyarı verilir.`],
       ["Hariç tutulanlar, nöbet tercihleri","—","Hariç tutma yalnız ilgili ay için (taşınmaz). “Nöbet istemiyor / istiyor / yalnız bu aralıkta” izin değil, tercihtir"],
       ["Onaylı hakediş (kişi)","—","Satır hesabı yerine onaylı değer; not/kaynak zorunlu; fark uyarı olarak kalır ve uyarı kaynak satırlarını listeler. Önerilen yol kayıt düzeyinde düzeltmedir: hakedişe girmemesi gereken kayıt gerekçesiyle “hakediş dışı” bırakılır (kaynak silinmez), eksik kayıt kaynağıyla elle eklenir"],
@@ -83,7 +81,7 @@
     <h2>4. Ay sınırı</h2>
     <ul><li>Geçen ayın son <b>3</b> gününün RESMÎ nöbetleri bu ayın ilk günleri için engeldir (fiilî liste değil).</li>
     <li>Bu nöbetler iki yoldan girilir: (1) geçen ayın <b>program çıktısı Excel'i</b> yüklenir (bölüm 6), (2) kişiler <b>elle</b> eklenir. PROBEL listesi yüklenmez (sürüm 3).</li>
-    <li>Kullanıcı “hepsi burada” kutusunu işaretleyince kayıt tam sayılır; bu onay çıktıdan gelen çizelgenin PROBEL'e aynen girildiğini de kapsar. Bir kategori yalnız elle girildiyse durum “Tam (elle girildi)” olur (bilgi notu; ekran, rapor Excel'i, PROBEL giriş dosyası ve denetçi iletisinde aynı ifade). Hiç nöbet girilmeden işaretlenirse sonuç “eksik veri” sayılır. Onay yoksa sonuç “eksik veri” sayılır ve güvenli mod ilk 2 günü kapatır.</li>
+    <li>Kullanıcı “hepsi burada” kutusunu işaretleyince kayıt tam sayılır; bu onay çıktıdan gelen çizelgenin PROBEL'e aynen girildiğini de kapsar. Bir kategori yalnız elle girildiyse durum “Tam (elle girildi)” olur (bilgi notu; ekran, rapor Excel'i, PROBEL giriş dosyası ve denetçi iletisinde aynı ifade). Hiç nöbet girilmeden işaretlenirse sonuç “eksik veri” sayılır. Onay yoksa sonuç “eksik veri” sayılır (ilk 2 gün kapatılmaz; uyarı verilir).</li>
     <li>Elle girilen ay sonu adı bu ayın listesindeki bir adla benzerse (ör. soyadı değişimi) “aynı kişi mi?” kararı istenir; karar verilene kadar benzer ada ay sınırı güvenli tarafta uygulanır ve bağımsız denetçi ihlali kesin hata sayar.</li>
     <li>Ay sonunda sonraki ayın resmî ilk günleri biliniyorsa onlara karşı da dinlenme denetlenir.</li>
     <li>“Sonraki aya devret” (aynı oturumda): resmî son nöbetler, onaylı açık devirler, ay sınırını aşan izinler, başlama/ayrılış ve klinik yetkiler taşınır; hariç tutma ve ödeme durumu taşınmaz; kurallar öneri olarak gelir ve yeniden onay ister.</li></ul>
@@ -109,7 +107,7 @@
     ${table(["Ağırlık","Değer","Anlamı"],Object.entries(w).map(([k,v])=>[`<code>${esc(k)}</code>`,num(v),esc(wDesc[k]||"")]))}
     <h3>“Çözüm yok” yalnız açık kanıtla söylenir</h3>
     <ol><li><b>Kişi kanıtı:</b> engeller, ${num(g.maxDutyDays)} gün ve dinlenme kuralıyla kişinin hakedişine hiçbir kategoride ulaşılamıyor.</li>
-    <li><b>Gün kanıtı:</b> bir günün asgari kadrosu için yazılabilecek kişi sayısı yetmiyor (neden dökümüyle: güvenli mod, izin, ay sınırı…).</li>
+    <li><b>Gün kanıtı:</b> bir günün asgari kadrosu için yazılabilecek kişi sayısı yetmiyor (neden dökümüyle: izin, ay sınırı…).</li>
     <li><b>Kapasite kanıtı:</b> yalnız bir kategoriye yazılabilenlerin en az gün ihtiyacı, o kategorinin günlük üst sınırları toplamını aşıyor.</li>
     <li><b>Kategori kapsama kanıtı:</b> devirsiz modda bir kategoriye ancak hakedişini o kategoride tamamlayabilen kişiler yazılabilir; bunlar asgari kadro isteyen günlerin hepsini kapsayamıyorsa (kesin arama; en çok ${num(cov.ms)} ms, ${num(cov.nodes)} düğüm, ${num(cov.maxCandidates)} aday — aşılırsa iddia edilmez).</li></ol>
     <p>Kanıt yoksa ve süre içinde çözüm bulunamazsa sonuç “bulunamadı (zaman sınırı)” olur — bu bir imkânsızlık kanıtı değildir.</p>
@@ -160,10 +158,10 @@
     const list=k=>(s.holidays||[]).filter(h=>(h.kind==="yarım gün")===(k==="half")).map(h=>h.kind==="yarım gün"?`${esc(h.date)} ${esc(h.label)} (FMS yetkili kuralıyla)`:`${esc(h.date)} ${esc(h.label)} FMS ${num(h.fms)}${h.confirmed?"":" (onaysız)"}`).join("; ")||"—";
     return`<h2>13. ${esc(mlabel)} — güncel değerler (bu sekmedeki çalışma)</h2>
     ${table(["Değer","Güncel"],[
-      ["Kural onayı",s.rulesConfirmed?"ONAYLI":"onaysız"],["Acil günlük en fazla / en az",`${num(s.emergencyCap)} / ${num(s.emergencyMin)}`],["Servis günlük en az / en fazla",`${num(s.serviceMin)} / ${num(s.serviceMax)}`],
+      ["Acil günlük en fazla / en az",`${num(s.emergencyCap)} / ${num(s.emergencyMin)}`],["Servis günlük en az / en fazla",`${num(s.serviceMin)} / ${num(s.serviceMax)}`],
       ["Belirli günler için farklı sınır",String((M.dailyRequirements||[]).length)],
       ["Resmî tatil var mı?",sd.holiday==null?"CEVAPLANMADI":sd.holiday?"Evet: "+list("hol"):"Hayır"],["Yarım gün var mı?",sd.halfDay==null?"CEVAPLANMADI":sd.halfDay?"Evet: "+list("half"):"Hayır"],
-      ["Güvenli mod",s.safeBoundary?"açık":"kapalı"],["Hakediş modu",s.mode==="defer"?"onaylı devir":"devirsiz"],
+      ["Hakediş modu",s.mode==="defer"?"onaylı devir":"devirsiz"],
       ["Hariç tutulan kişi",String((M.exclusions||[]).length)],["İzin / müsait olmama kaydı",`${(M.leaves||[]).length} / ${(M.unavailable||[]).length}`],
       ["Özel vardiya kuralları",(g.specialShiftRules||[]).map(r=>`${esc(r.start)}–${esc(r.end)}: ${Object.entries(r.fms||{}).map(([k,v])=>`${esc(DAYKEY[k]||k)} ${num(v)}`).join(", ")}`).join("<br>")||"—"],
       ["Oryantasyon nöbeti","gerçek nöbet (sabit kural)"],

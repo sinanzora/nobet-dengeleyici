@@ -155,7 +155,7 @@
         const need=e.target+settle;const short=C.round2(need-official);
         if(short>0.001){
           if(s.mode!=="defer")out.push(issue("error","ENTITLEMENT_LOSS",`${nm}: kazanılan ${C.fmtNum(need)} eşdeğer saat, resmî karşılık ${C.fmtNum(official)}; ${C.fmtNum(short)} saat eksik (devirsiz mod).`));
-          else{const st=M.staff?.[pid]||{};if(st.paymentStatus==="paid")out.push(issue("info","SHORT_PAID",`${nm}: ${C.fmtNum(short)} saat fark bordroda ödenmiş işaretli; devredilmez.`));else if(st.paymentStatus==="unpaid"&&st.deferApproved&&s.approvedBy)out.push(issue("info","SHORT_DEFERRED",`${nm}: ${C.fmtNum(short)} saat onaylı devir (${s.approvedBy}).`));else out.push(issue("warning","SHORT_PENDING",`${nm}: ${C.fmtNum(short)} eşdeğer saat fark; ödeme durumu/yetkili onayı yok — kesin alacak DEĞİL, mutabakat bekliyor.`,{incomplete:true}));}
+          else{const st=M.staff?.[pid]||{};if(st.paymentStatus==="paid")out.push(issue("info","SHORT_PAID",`${nm}: ${C.fmtNum(short)} saat fark bordroda ödenmiş işaretli; devredilmez.`));else if(st.paymentStatus==="unpaid"&&st.deferApproved)out.push(issue("info","SHORT_DEFERRED",`${nm}: ${C.fmtNum(short)} saat sonraki aya devir (ödenmedi, devret işaretli).`));else out.push(issue("warning","SHORT_PENDING",`${nm}: ${C.fmtNum(short)} eşdeğer saat fark; ödeme durumu/yetkili onayı yok — kesin alacak DEĞİL, mutabakat bekliyor.`,{incomplete:true}));}
         }else if(short<-0.001)out.push(issue("warning","OVERPAY",`${nm}: resmî karşılık hakedişten ${C.fmtNum(-short)} eşdeğer saat fazla.`));
       }
     }
