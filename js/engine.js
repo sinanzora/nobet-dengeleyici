@@ -275,15 +275,12 @@
   /* liste eksikken elle tamamlanan ay sonu kaydının TEK ifadesi (ekran, rapor, PROBEL giriş dosyası, talimatname, denetçi) */
   const PRIOR_MANUAL_LABEL="Tam (elle girildi)";
   function priorStatus(db,M){
-    const lists={Servis:!!M.priorOfficial.Servis,Acil:!!M.priorOfficial.Acil};
-    const origins=Object.values(M.priorOfficial).filter(Boolean).map(x=>x.origin);
-    /* sürüm 3: PROBEL listesi yüklenmez. Kaynaklar: geçen ayın program çıktısı (uygulama planı) ve elle giriş. Kullanıcının “hepsi burada”
-       onayı (priorListsComplete) tam kayıt sayılır ve çıktıdaki planın PROBEL'e aynen girildiğini de kapsar (priorPlanConfirmed ile eşdeğer). */
-    const planBased=origins.includes("app-plan")&&!M.priorPlanConfirmed&&!M.priorListsComplete;
-    const listsOk=!!(lists.Servis&&lists.Acil)&&!planBased;const complete=listsOk||!!M.priorListsComplete;
-    /* bir liste eksik + “hepsi burada” + elle ay sonu nöbeti girilmiş: kayıt elle tamamlandı */
-    const manualFill=!!M.priorListsComplete&&!(lists.Servis&&lists.Acil)&&(M.priorManual||[]).some(x=>x.kind==="duty");
-    return{lists,complete,planBased,manualFill,any:lists.Servis||lists.Acil||M.priorManual.length>0};
+    const lists={Servis:!!M.priorOfficial.Servis,Acil:!!M.priorOfficial.Acil};const days=new Set(C.priorBoundaryDays(M.month));
+    /* 3.3.2 (kullanıcı isteği 15.10.2026): “hepsi burada” onayı kaldırıldı. Geçen ayın son 2 günü için aktarılan (program çıktısı) ya da elle
+       girilen resmî nöbetler TAM kayıt kabul edilir; hiç nöbet bilinmiyorsa eksik. Gün başı makullük uyarısı (PRIOR_DAY_THIN) sürer. */
+    const known=["Servis","Acil"].some(c=>((M.priorOfficial[c]&&M.priorOfficial[c].persons)||[]).some(p=>(p.duties||[]).some(d=>days.has(d.date))))||(M.priorManual||[]).some(x=>x.kind==="duty"&&days.has(x.date));
+    const manualFill=known&&!(lists.Servis&&lists.Acil)&&(M.priorManual||[]).some(x=>x.kind==="duty"&&days.has(x.date));
+    return{lists,complete:known,planBased:false,manualFill,any:known||lists.Servis||lists.Acil||(M.priorManual||[]).length>0};
   }
   /* pid -> [{date, reason, kind:'kesin'|'güvenli'}] */
   function boundaryBlocks(db,M,staffList){

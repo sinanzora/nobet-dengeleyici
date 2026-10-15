@@ -64,7 +64,7 @@
       ["Belirli günler için farklı sınır","—","Tarih bazında Servis/Acil en az–en fazla"],
       ["“Bu ay resmî tatil var mı?”","cevapsız","<b>Her ay sorulur</b>; Evet ise günler ve her günün FMS'i girilip onaylanır"],
       ["“Bu ay yarım gün çalışma var mı?” (ör. bayram arifesi)","cevapsız","<b>Her ay sorulur</b>; Evet ise günler girilir. Nöbet FMS'i sorulmaz (yetkili kuralı, bölüm 1); hafta içi arefede özel vardiyaların yarım gün FMS'i ayrıca istenir"],
-      ["Geçen ayın son 2 günündeki resmî nöbetler","girilmedi","Geçen ayın program çıktısı Excel'inden gelir ya da elle girilir; “hepsi burada” onayıyla tam sayılır (bölüm 4)"],
+      ["Geçen ayın son 2 günündeki resmî nöbetler","girilmedi","Geçen ayın program çıktısı Excel'inden gelir ya da elle işaretlenir; girilen kayıt tam sayılır (bölüm 4)"],
       ["Hakediş modu",d.monthDefaults.mode==="strict"?"Devirsiz":"Onaylı devir","Devirsiz: resmî karşılık fiilî hakedişten az olamaz. Onaylı devir: eksik kalan fark yetkili onayıyla sonraki aya devredilebilir"],
       ["Başlangıç kontrol edildi (kişi)","—","Oryantasyonla başlayan ya da geçen ayın fiilî listesinde olmayan kişi için “yeni mi başladı?” uyarısını kapatır; yeni başladıysa bunun yerine “Henüz başlamadı” izni girilir. Program başlama tarihini tahmin etmez"],
       ["İzin = personelin ÇALIŞMADIĞI her gün","—",`Sebepler (yalnız bilgi; hepsi aynı işlenir, o günlerde resmî nöbet yazılmaz): ${(d.leaveReasons||[]).map(esc).join(", ")}. İşten ayrılış: ayrıldığı günden ay sonuna; henüz başlamadı: ay başından başladığı güne kadar girilir. Ay sınırını aşan izin sonraki aya taşınır. İzinli günde fiilî nöbet varsa uyarı verilir.`],
@@ -81,7 +81,7 @@
     <h2>4. Ay sınırı</h2>
     <ul><li>Geçen ayın son <b>3</b> gününün RESMÎ nöbetleri bu ayın ilk günleri için engeldir (fiilî liste değil).</li>
     <li>Bu nöbetler iki yoldan girilir: (1) geçen ayın <b>program çıktısı Excel'i</b> yüklenir (bölüm 6), (2) kişiler <b>elle</b> eklenir. PROBEL listesi yüklenmez (sürüm 3).</li>
-    <li>Kullanıcı “hepsi burada” kutusunu işaretleyince kayıt tam sayılır; bu onay çıktıdan gelen çizelgenin PROBEL'e aynen girildiğini de kapsar. Bir kategori yalnız elle girildiyse durum “Tam (elle girildi)” olur (bilgi notu; ekran, rapor Excel'i, PROBEL giriş dosyası ve denetçi iletisinde aynı ifade). Hiç nöbet girilmeden işaretlenirse sonuç “eksik veri” sayılır. Onay yoksa sonuç “eksik veri” sayılır (ilk 2 gün kapatılmaz; uyarı verilir).</li>
+    <li>Geçen ayın son 2 günü için aktarılan ya da elle girilen resmî nöbetler tam kayıt sayılır (onay kutusu yok — 3.3.2). Bir kategori yalnız elle girildiyse durum “Tam (elle girildi)” olur. Hiç nöbet girilmemişse sonuç “eksik veri” sayılır; bir günde bu ayın günlük asgarisinden az kişi biliniyorsa uyarı verilir (ilk 2 gün kapatılmaz).</li>
     <li>Elle girilen ay sonu adı bu ayın listesindeki bir adla benzerse (ör. soyadı değişimi) “aynı kişi mi?” kararı istenir; karar verilene kadar benzer ada ay sınırı güvenli tarafta uygulanır ve bağımsız denetçi ihlali kesin hata sayar.</li>
     <li>Ay sonunda sonraki ayın resmî ilk günleri biliniyorsa onlara karşı da dinlenme denetlenir.</li>
     <li>“Sonraki aya devret” (aynı oturumda): resmî son nöbetler, onaylı açık devirler, ay sınırını aşan izinler, başlama/ayrılış ve klinik yetkiler taşınır; hariç tutma ve ödeme durumu taşınmaz; kurallar öneri olarak gelir ve yeniden onay ister.</li></ul>

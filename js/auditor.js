@@ -71,20 +71,17 @@
     const earned=earnedByPerson(db,M);
     /* --- önceki ay resmî kaydı durumu (T21) --- */
     const lists={Servis:M.priorOfficial?.Servis,Acil:M.priorOfficial?.Acil};
-    /* sürüm 3: “hepsi burada” onayı tam kayıt sayılır (çıktı planını da kapsar) */
-    const planBased=Object.values(lists).some(x=>x&&x.origin==="app-plan")&&!M.priorPlanConfirmed&&!M.priorListsComplete;
-    const listsOk=!!(lists.Servis&&lists.Acil)&&!planBased;const complete=listsOk||!!M.priorListsComplete;const pl3=lastDaysOfPrev(month);
-    const knownDuty=["Servis","Acil"].some(c=>((lists[c]&&lists[c].persons)||[]).some(p=>(p.duties||[]).some(d=>pl3.includes(d.date))))||(M.priorManual||[]).some(x=>x.kind==="duty"&&pl3.includes(x.date));
-    /* “hepsi burada” makullüğü (FABLE T13-2): her gün bilinen resmî nöbetçi sayısı bu ayın günlük asgari toplamından az olmamalı */
+    /* 3.3.2: “hepsi burada” onayı yok — son 2 gün için bilinen resmî nöbet varsa kayıt tam kabul edilir, yoksa eksik (motordan bağımsız) */
+    const pl3=lastDaysOfPrev(month);
+    const knownDuty=["Servis","Acil"].some(c=>((lists[c]&&lists[c].persons)||[]).some(p=>(p.duties||[]).some(d=>pl3.includes(d.date))))||(M.priorManual||[]).some(x=>x.kind==="duty"&&pl3.includes(x.date));const complete=knownDuty;
+    /* gün başı makullük (FABLE T13-2): her gün bilinen resmî nöbetçi sayısı bu ayın günlük asgari toplamından az olmamalı */
     const minDay=(C.num(s.serviceMin)||0)+(C.num(s.emergencyMin)||0);const perDay=new Map(pl3.map(d=>[d,new Set()]));
     for(const c of["Servis","Acil"])for(const p of((lists[c]&&lists[c].persons)||[]))for(const d of p.duties||[])if(perDay.has(d.date))perDay.get(d.date).add(pidOf(db,p.name));
     for(const x of M.priorManual||[])if(x.kind==="duty"&&perDay.has(x.date))perDay.get(x.date).add(x.pid);
     const thinDays=[...perDay].filter(([d,set])=>set.size<minDay);
-    if(!lists.Servis&&!lists.Acil&&!(M.priorManual||[]).length&&!M.priorListsComplete)out.push(issue("warning","PRIOR_MISSING",`${C.monthLabel(C.prevMonth(month))} ayının son 2 günündeki resmî nöbetler girilmedi (Adım 1 → ②: geçen ayın program çıktısı ya da elle giriş): ay başı sınırı DOĞRULANMADI. Çizelge 'tam denetlendi / üretime hazır' sayılamaz.`,{incomplete:true}));
-    else if(M.priorListsComplete&&!knownDuty)out.push(issue("warning","PRIOR_EMPTY_CONFIRMED",`${C.monthLabel(C.prevMonth(month))} ayının son 2 günü için hiç resmî nöbet girilmeden “hepsi burada” işaretlendi. Her gün en az bir nöbetçi beklenir; Adım 1 → ② bölümünü kontrol edin. Ay başı sınırı doğrulanmış sayılmadı.`,{incomplete:true}));
-    else if(complete&&!(lists.Servis&&lists.Acil)&&M.priorListsComplete&&(M.priorManual||[]).some(x=>x.kind==="duty"))out.push(issue("info","PRIOR_MANUAL_ONLY",`${C.monthLabel(C.prevMonth(month))} ayının son 2 günündeki resmî nöbetler elle girildi ve “hepsi burada” işaretlendi: Tam (elle girildi). Ay başı sınırı girilen kayıtlara göre kontrol edildi.`));
-    else if(!complete)out.push(issue("warning","PRIOR_PARTIAL",`${C.monthLabel(C.prevMonth(month))} ayının son 2 günündeki resmî nöbetler onaylanmadı${planBased?" (geçen ayın program çıktısından geldi; PROBEL'e aynen girildiği onaylanmadı)":""}. Adım 1 → ②: eksik varsa elle ekleyip “hepsi burada”yı işaretleyin. Ay başı sınırı tam doğrulanmadı.`,{incomplete:true}));
-    if(M.priorListsComplete&&knownDuty&&thinDays.length)out.push(issue("warning","PRIOR_DAY_THIN",`${C.monthLabel(C.prevMonth(month))} son 2 gün için “hepsi burada” denildi, ama ${thinDays.map(([d,set])=>`${C.fmtDate(d)}: ${set.size} kişi`).join(", ")} biliniyor; bu ayın günlük asgarisine göre (Servis ${C.num(s.serviceMin)||0} + Acil ${C.num(s.emergencyMin)||0}) her gün en az ${minDay} beklenirdi. Eksik kişi varsa Adım 1 → ② bölümünde ekleyin. Ay başı sınırı girilen kayıtlara göre kontrol edildi; tam doğrulanmış sayılmadı.`,{incomplete:true}));
+    if(!knownDuty)out.push(issue("warning","PRIOR_MISSING",`${C.monthLabel(C.prevMonth(month))} ayının son 2 günündeki resmî nöbetler girilmedi (Adım 1 → ②: geçen ayın program çıktısı ya da elle işaretleme): ay başı sınırı DOĞRULANMADI. Çizelge 'tam denetlendi / üretime hazır' sayılamaz.`,{incomplete:true}));
+    else if(!(lists.Servis&&lists.Acil)&&(M.priorManual||[]).some(x=>x.kind==="duty"&&pl3.includes(x.date)))out.push(issue("info","PRIOR_MANUAL_ONLY",`${C.monthLabel(C.prevMonth(month))} ayının son 2 günündeki resmî nöbetler elle girildi: Tam (elle girildi). Ay başı sınırı girilen kayıtlara göre kontrol edildi.`));
+    if(knownDuty&&thinDays.length)out.push(issue("warning","PRIOR_DAY_THIN",`${C.monthLabel(C.prevMonth(month))} son 2 gün için ${thinDays.map(([d,set])=>`${C.fmtDate(d)}: ${set.size} kişi`).join(", ")} biliniyor; bu ayın günlük asgarisine göre (Servis ${C.num(s.serviceMin)||0} + Acil ${C.num(s.emergencyMin)||0}) her gün en az ${minDay} beklenirdi. Eksik kişi varsa Adım 1 → ② bölümünde ekleyin. Ay başı sınırı girilen kayıtlara göre kontrol edildi; tam doğrulanmış sayılmadı.`,{incomplete:true}));
     /* bağımsız ay sınırı engelleri */
     const last3=new Set(lastDaysOfPrev(month));const bnd=new Map();const addB=(pid,date,why)=>{if(!date.startsWith(month))return;(bnd.get(pid)||bnd.set(pid,[]).get(pid)).push({date,why});};
     const rosterPids=new Set(roster.map(a=>a.pid));const staffPids=new Set([...earned.keys(),...rosterPids]);
