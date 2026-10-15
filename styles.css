@@ -154,12 +154,24 @@ dialog::backdrop{background:rgba(18,61,58,.35)}
 .rg-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;font-size:12px}.rg-btns{display:flex;gap:6px}
 @media (max-width:760px),(pointer:coarse){.range-wrap{grid-column:1/-1}.rg-day{height:42px}.range-pop{position:fixed;left:16px;right:16px;top:auto;bottom:16px;width:auto}}
 
-/* 3.6.0 tanıtım videosu penceresi */
+/* 3.6.0–3.6.1 tanıtım videosu penceresi: ortada büyük oynat düğmesi (nabız + yayılan halkalar) */
 dialog.tanitim{border:0;padding:0;border-radius:20px;background:#0b2522;color:#fff;max-width:min(94vw,480px);box-shadow:0 30px 80px rgba(0,0,0,.45);overflow:hidden}
 dialog.tanitim::backdrop{background:rgba(6,20,18,.72)}
-.tanitim-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:14px 12px 10px 18px}
+.tanitim-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:14px 12px 12px 18px}
 .tanitim-head strong{display:block;font-size:17px}.tanitim-head span{display:block;font-size:13px;color:#b9d5cf;margin-top:3px}
-.tanitim .icon-btn{color:#d7ebe6}
-.tanitim video{display:block;height:min(64vh,150vw,820px);width:auto;max-width:100%;aspect-ratio:9/16;margin:0 auto;background:#000}
-.tanitim-foot{display:flex;justify-content:center;padding:12px 16px 16px}
-.tanitim-foot .primary{padding:11px 22px;border-radius:12px;font-weight:700;font-size:15px}
+.tanitim .tanitim-kapat{font-size:30px;line-height:1;padding:4px 12px 7px;color:#fff;background:rgba(255,255,255,.1);border-radius:12px}
+.tanitim .tanitim-kapat:hover{background:rgba(255,255,255,.2);color:#fff}
+.tanitim-video{position:relative;width:fit-content;max-width:100%;margin:0 auto 14px}
+.tanitim video{display:block;height:min(66vh,150vw,820px);width:auto;max-width:100%;aspect-ratio:9/16;background:#000}
+.tanitim-oynat{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:0;padding:0;margin:0;background:radial-gradient(circle at 50% 46%,rgba(0,0,0,.05) 0,rgba(0,0,0,.42) 72%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;color:#fff;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.tanitim-oynat[hidden]{display:none}
+.tanitim-oynat .halka{position:relative;width:116px;height:116px}
+.tanitim-oynat .daire{position:absolute;inset:0;border-radius:50%;background:linear-gradient(140deg,#f6b44a,#f28245);display:grid;place-items:center;box-shadow:0 0 0 9px rgba(246,180,74,.3),0 18px 44px rgba(0,0,0,.5);animation:tnNabiz 1.6s ease-in-out infinite}
+.tanitim-oynat svg{width:58px;height:58px;fill:#fff;margin-left:8px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.25))}
+.tanitim-oynat .dalga{position:absolute;inset:0;border-radius:50%;border:4px solid rgba(246,180,74,.95);animation:tnDalga 2s ease-out infinite;pointer-events:none}
+.tanitim-oynat .d2{animation-delay:1s}
+.tanitim-oynat .etiket{font-size:17px;font-weight:900;letter-spacing:2px;padding:10px 18px;border-radius:999px;background:rgba(0,0,0,.62);border:2px solid rgba(255,255,255,.4);box-shadow:0 10px 26px rgba(0,0,0,.35);white-space:nowrap}
+.tanitim-oynat:focus{outline:none}.tanitim-oynat:focus-visible .daire{box-shadow:0 0 0 4px #fff,0 0 0 13px rgba(246,180,74,.4),0 18px 44px rgba(0,0,0,.5)}
+@keyframes tnNabiz{0%,100%{transform:scale(1)}50%{transform:scale(1.09)}}
+@keyframes tnDalga{0%{transform:scale(1);opacity:.95}100%{transform:scale(2.4);opacity:0}}
+@media (prefers-reduced-motion:reduce){.tanitim-oynat .daire,.tanitim-oynat .dalga{animation:none}}

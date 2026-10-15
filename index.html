@@ -129,9 +129,9 @@
 
   <dialog id="dlg"><form method="dialog" id="dlgForm"><div class="dialog-head"><h2 id="dlgTitle"></h2><button value="cancel" class="icon-btn" aria-label="Kapat" formnovalidate>×</button></div><div id="dlgBody" class="dialog-body"></div><div class="dialog-actions"><button value="cancel" class="ghost" id="dlgCancel" formnovalidate>Vazgeç</button><button value="ok" class="primary" id="dlgOk">Tamam</button></div></form></dialog>
   <dialog id="tanitimDlg" class="tanitim" aria-labelledby="tanitimBaslik">
-    <div class="tanitim-head"><div><strong id="tanitimBaslik">Nöbet Dengeleyici'ye hoş geldiniz</strong><span>4 dakikalık tanıtımı izleyin ya da hemen başlayın.</span></div><button type="button" class="icon-btn" data-tanitim="kapat" aria-label="Kapat">×</button></div>
-    <video id="tanitimVideo" src="media/tanitim.mp4" poster="media/tanitim_kapak.jpg" controls playsinline preload="none"></video>
-    <div class="tanitim-foot"><button type="button" class="primary" data-tanitim="kapat" autofocus>Programa başla →</button></div>
+    <div class="tanitim-head"><div><strong id="tanitimBaslik">Nöbet Dengeleyici'ye hoş geldiniz</strong><span>Önce 4 dakikalık tanıtımı izleyin. Atlamak için ×.</span></div><button type="button" class="icon-btn tanitim-kapat" data-tanitim="kapat" aria-label="Tanıtımı kapat, programa geç">×</button></div>
+    <div class="tanitim-video"><video id="tanitimVideo" src="media/tanitim.mp4" poster="media/tanitim_kapak.jpg" playsinline preload="none"></video>
+      <button type="button" class="tanitim-oynat" id="tanitimOynat" aria-label="Tanıtım videosunu oynat" autofocus><span class="halka"><span class="dalga"></span><span class="dalga d2"></span><span class="daire"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg></span></span><span class="etiket">VİDEOYU İZLE · 4:37</span></button></div>
   </dialog>
 
   <script src="vendor/xlsx.full.min.js"></script>

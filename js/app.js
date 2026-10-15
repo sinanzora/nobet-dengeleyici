@@ -62,10 +62,13 @@
 
   /* ---------------- başlatma ---------------- */
   /* 3.6.0: tanıtım videosu penceresi — video yalnız “oynat”a basılınca yüklenir (preload="none"); kapanınca durur */
-  function setupIntro(){const d=$("#tanitimDlg");if(!d)return;const v=$("#tanitimVideo");
+  function setupIntro(){const d=$("#tanitimDlg");if(!d)return;const v=$("#tanitimVideo"),o=$("#tanitimOynat");
     d.addEventListener("click",e=>{if(e.target===d||e.target.closest("[data-tanitim=kapat]"))closeIntro();});
     d.addEventListener("close",()=>{try{if(v)v.pause();}catch(e){}});
-    if(v)v.addEventListener("ended",()=>{const b=d.querySelector(".tanitim-foot .primary");if(b)b.focus();});}
+    /* 3.6.1: büyük oynat düğmesi — dokununca yerleşik denetimler açılır ve video başlar (tarayıcı engellerse denetimlerden oynatılır) */
+    if(o&&v)o.addEventListener("click",()=>{o.hidden=true;v.controls=true;try{const p=v.play();if(p&&p.catch)p.catch(()=>{});}catch(e){}});
+    /* video bitince pencere kapanır, program açılır; yeniden açılırsa büyük düğme tekrar görünür */
+    if(v)v.addEventListener("ended",()=>setTimeout(()=>{closeIntro();v.controls=false;if(o)o.hidden=false;try{v.currentTime=0;}catch(e){}},900));}
   function showIntro(){const d=$("#tanitimDlg");if(!d||d.open)return;try{d.showModal();}catch(e){d.setAttribute("open","");}}
   function closeIntro(){const d=$("#tanitimDlg");if(!d)return;try{$("#tanitimVideo").pause();}catch(e){}if(d.open)d.close();}
   function init(){
