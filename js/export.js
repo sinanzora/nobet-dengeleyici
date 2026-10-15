@@ -9,7 +9,7 @@
   /* PROBEL ekranındaki renkler (kullanıcının PROBEL ekran görüntüleri; 3.3.3'te 15.10.2026 görüntüsüyle düzeltildi): nöbet H.İçi sarı, Cuma mor,
      C.tesi turuncu, Pazar mavi; 08:00-16:00 yeşil; Yİz. açık mavi; Bşl. (başlamadı) turuncu-kırmızı; hafta sonu sütunu gri (H.S., NSİ ve öteki kodlar); NSİ hafta içinde renksiz.
      Doğrulanmamış etiket kırmızı. Öteki izin kodlarının rengi görülmedi: hafta içinde renksiz. */
-  function probelStyle(t,weekend){if(/ONAY BEKLİYOR/.test(t))return"error";if(/H\.İçi$/.test(t))return"pHici";if(/Cuma$/.test(t))return"pCuma";if(/C\.tesi$/.test(t))return"pCtesi";if(/Pazar$/.test(t))return"pPazar";if(/^08:00-1[36]:00$/.test(t))return"pMesai";if(t==="Yİz.")return"pYiz";if(t==="Bşl.")return"pBsl";if(t==="Rpr.")return"pRpr";if(t==="GÖREV")return"pGorev";if(t==="R.T.")return"pRt";return weekend?"pHs":null;}
+  function probelStyle(t,weekend){if(/ONAY BEKLİYOR/.test(t))return"error";if(/H\.İçi$/.test(t))return"pHici";if(/Cuma$/.test(t))return"pCuma";if(/C\.tesi$/.test(t))return"pCtesi";if(/Pazar$/.test(t))return"pPazar";if(/^08:00-1[36]:00$/.test(t))return"pMesai";if(t==="Yİz.")return"pYiz";if(t==="Bşl."||t==="Ayr.")return"pBsl";if(t==="Rpr.")return"pRpr";if(t==="GÖREV")return"pGorev";if(t==="R.T.")return"pRt";return weekend?"pHs":null;}
   const PROBEL_LEGEND="Renkler PROBEL ekranındaki gibi: nöbet H.İçi sarı · Cuma mor · C.tesi turuncu · Pazar mavi; 08:00-16:00 yeşil; Yİz. açık mavi; Rpr. mor; GÖREV turkuaz; Bşl. (başlamadı) turuncu-kırmızı; R.T. (resmî tatil) kırmızı, hafta sonuna denk gelirse “H.S. R.T.”; hafta sonu sütunu (H.S., NSİ) gri; NSİ hafta içinde renksiz; ONAY BEKLİYOR kırmızı (etiket doğrulanmadı). Arefe mesaisi 08:00-13:00 ve öteki izinler (Ayr. …) PROBEL'de görülmedi (renksiz).";
   /* 3.3.3 (kullanıcı isteği 15.10.2026): nöbetsiz günler de PROBEL yazımıyla gösterilir. Kanıt: PROBEL metin dökümleri (Temmuz/Ağustos 2026) —
      hafta içi “08:00-16:00”, hafta sonu “H.S.”, izinler “Yİz.”, “Rpr.”, “GÖREV”, “Ayr.”, başlama öncesi “Bşl.”, resmî tatil “R.T.” (hafta sonunda “H.S. R.T.”) (kullanıcının PROBEL ekran görüntüleri); izin hafta sonuna taşarsa
@@ -57,17 +57,19 @@
   function probelEntryRows(db,M,result,cat){
     const dates=C.monthDates(M.month);const sp=spellingMap(db,M);
     const by=new Map();for(const a of(result.assignments||[]).filter(x=>x.category===cat)){(by.get(a.pid)||by.set(a.pid,[]).get(a.pid)).push(a);}
-    const head=["Personel","Sicil No",...dates.map(d=>{const w=C.weekday(d);return w===0||w===6?{v:String(+d.slice(8)),s:"pHsHead"}:String(+d.slice(8));}),"Nöbet günü","FMS (plan)","Servis-eşdeğeri saat"];
+    const head=["Personel","Sicil No",...dates.map(d=>{const w=C.weekday(d);return w===0||w===6?{v:String(+d.slice(8)),s:"pHsHead"}:String(+d.slice(8));}),"Nöbet günü","FMS (PROBEL)","Servis-eşdeğeri saat","Ay sınırı"];
     const isWe=d=>{const w=C.weekday(d);return w===0||w===6;};
-    const head2=["","",...dates.map(d=>isWe(d)?{v:C.dayShort(d),s:"pHsHead"}:C.dayShort(d)),"","",""];
+    const head2=["","",...dates.map(d=>isWe(d)?{v:C.dayShort(d),s:"pHsHead"}:C.dayShort(d)),"","","",""];
     const rows=[[{v:`${C.monthLabel(M.month)} — ${C.trUpper(cat)} RESMÎ NÖBET LİSTESİ (PROBEL GİRİŞ TASLAĞI)`,s:"title"}],head,head2];
-    const people=[...by.keys()].sort((a,b)=>displayFor(db,M,a,sp).localeCompare(displayFor(db,M,b,sp),"tr"));const priorLast=priorLastDayDuty(db,M);
+    const people=[...by.keys()].sort((a,b)=>displayFor(db,M,a,sp).localeCompare(displayFor(db,M,b,sp),"tr"));const priorLast=priorLastDayDuty(db,M);const bi=E.boundaryInfo(db,M);
     for(const pid of people){const arr=by.get(pid);const set=new Map(arr.map(a=>[a.date,a]));
       const hol=d=>(M.settings.holidays||[]).find(h=>h.date===d);
       const cells=dates.map((d,i)=>{let t="";if(set.has(d)){const h=hol(d);t=`08:00-08:00 ${h?holidayLabel(h,d):LABEL[C.weekday(d)]}`;}else if(set.has(C.addDays(d,-1))||(i===0&&priorLast.has(pid)))t="NSİ";if(!t)t=offDayText(db,M,pid,d);return{v:t,s:probelStyle(t,isWe(d))};});
-      rows.push([displayFor(db,M,pid,sp),db.people[pid]?.sicil||"",...cells,arr.length,arr.reduce((z,a)=>z+(a.fms||0),0),C.round2(arr.reduce((z,a)=>z+(a.eq||0),0))]);}
-    rows.push([]);rows.push([{v:PROBEL_LEGEND,s:"warn"}]);rows.push([{v:"Not: NSİ = nöbet ertesi izin (ücretli nöbet değildir). Ay sonundaki nöbetin NSİ'si sonraki ayın 1. günüdür. Bu taslağı PROBEL'e girmeden önce kontrol edin.",s:"warn"}]);
-    return{rows,widths:[26,10,...dates.map(()=>9),10,10,12],header:true,headerRow:1,freeze:3};
+      /* 3.4.0: FMS = PROBEL'in bu ay göstereceği sayı (ay sınırı dahil) */
+      const adj=E.boundaryAdj(db,M,pid,result.assignments,bi);
+      rows.push([displayFor(db,M,pid,sp),db.people[pid]?.sicil||"",...cells,arr.length,arr.reduce((z,a)=>z+(a.fms||0),0)+adj.fms,C.round2(arr.reduce((z,a)=>z+(a.eq||0),0)+adj.fms*(db.global.factors[cat]||0)),adj.fms?`${adj.fms>0?"+":"−"}${Math.abs(adj.fms)} (${adj.text})`:""]);}
+    rows.push([]);rows.push([{v:PROBEL_LEGEND,s:"warn"}]);rows.push([{v:"Not: NSİ = nöbet ertesi izin (ücretli nöbet değildir). Ay sonundaki nöbetin NSİ'si sonraki ayın 1. günüdür. FMS (PROBEL) = PROBEL'in FMS sütunu (çalışılan − gereken saat), ay sınırı dahil: ayın son günü nöbeti ertesi gün iş günüyse +8, geçen ayın son günü nöbetinin NSİ'si bu ayın iş gününe düşüyorsa −8. Bu taslağı PROBEL'e girmeden önce kontrol edin.",s:"warn"}]);
+    return{rows,widths:[26,10,...dates.map(()=>9),10,10,12,40],header:true,headerRow:1,freeze:3};
   }
   /* ay sonu kaydının durumu — ekran, rapor ve PROBEL giriş dosyasında aynı ifade */
   function priorText(db,M){const ps=E.priorStatus(db,M);return`Servis: ${M.priorOfficial.Servis?"var ("+(M.priorOfficial.Servis.origin==="app-plan"?"uygulama planı":M.priorOfficial.Servis.fileName)+")":"YOK"} · Acil: ${M.priorOfficial.Acil?"var ("+(M.priorOfficial.Acil.origin==="app-plan"?"uygulama planı":M.priorOfficial.Acil.fileName)+")":"YOK"}${(M.priorManual||[]).some(x=>x.kind==="duty")?` · elle girilen ay sonu nöbeti: ${M.priorManual.filter(x=>x.kind==="duty").length}`:""}${ps.complete?(ps.manualFill?" → "+E.PRIOR_MANUAL_LABEL:" → tam"):" → ay başı sınırı TAM DOĞRULANMADI"}`;}

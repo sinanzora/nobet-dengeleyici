@@ -13,8 +13,9 @@
   /* Varsayılan çözücü ağırlıkları (talimatnamede listelenir). over/short: eşdeğer saat başına fazla/eksik cezası; day: gün başına;
      actual: fiilen çalışılan güne yazma ödülü; weekend: hafta sonu cezası; avoid/prefer: kişi tercihleri; balanceServis/balanceAcil: günlük yük dengesi;
      hard: günlük sınır ihlali başlangıç fiyatı (uyarlamalı artar); switch: kategori değiştirme cezası;
+     boundary: ay sınırı (3.4.0) — son günün +8 ekini fazla ödeme cezasıyla dengeledikten sonra eklenen küçük ceza: eşitlikte son gün seçilmez (sonraki aya borç yığılmaz);
      posted: bu ayın PROBEL'e işlenmiş nöbetini koruma ödülü (yalnız bu ayın PROBEL listesi yüklüyse ve “koru” seçiliyse; yumuşak tercih, kesin kural değil). */
-  const DEFAULT_WEIGHTS=Object.freeze({over:10,short:60,day:1,actual:4,weekend:0.4,avoid:25,prefer:4,balanceServis:3,balanceAcil:0.5,hard:40,switch:0.5,posted:6});
+  const DEFAULT_WEIGHTS=Object.freeze({over:10,short:60,day:1,actual:4,weekend:0.4,avoid:25,prefer:4,balanceServis:3,balanceAcil:0.5,hard:40,switch:0.5,posted:6,boundary:5});
   /* kategori iyileştirme turunun sınırları: en çok bu kadar tur ve süre (ms; ayrıca çözücü süre sınırını aşmaz) */
   const IMPROVE=Object.freeze({rounds:40,ms:8000,maxCombo:10,maxHelpers:12});
   /* kategori kapsama kanıtının arama sınırları; aşılırsa kanıt iddia edilmez */
@@ -93,7 +94,7 @@
      Her aday hedefine ulaşabildiği için (maxReachable ≥ hedef) adayların hepsini kullanmak kapsamayı daraltmaz. */
   function coverageSearch(values,cand,need,opt,msLimit,nodeLimit){
     const N=values.length,K=opt.maxDays,G=opt.minGap;const t0=now();let nodes=0;
-    const bestFrom=cand.map(p=>{const B=Array.from({length:N+G+1},()=>new Array(K+1).fill(0));for(let d=N-1;d>=0;d--)for(let k=1;k<=K;k++){const take=(!p.blockedArr[d]&&values[d]!=null)?values[d]+B[d+G][k-1]:-Infinity;B[d][k]=Math.max(B[d+1][k],take);}return B;});
+    const bestFrom=cand.map(p=>{const B=Array.from({length:N+G+1},()=>new Array(K+1).fill(0));for(let d=N-1;d>=0;d--)for(let k=1;k<=K;k++){const pvv=p.vals||values;const take=(!p.blockedArr[d]&&pvv[d]!=null)?pvv[d]+B[d+G][k-1]:-Infinity;B[d][k]=Math.max(B[d+1][k],take);}return B;});
     const st=cand.map(()=>({cnt:0,last:-1e9,sum:0}));
     const future=d=>{for(let i=0;i<cand.length;i++){const s=st[i];const rest=cand[i].target-s.sum;if(rest<=1e-9)continue;const from=Math.max(d,s.last+G);if(from>=N||K-s.cnt<=0||bestFrom[i][from][K-s.cnt]+1e-9<rest)return false;}return true;};
     const popc=x=>{let c=0;while(x){c+=x&1;x>>>=1;}return c;};
@@ -104,7 +105,7 @@
       const req=need[d]||0;if(can.length<req)return false;
       const n=Math.min(can.length,20);const subs=[];for(let m=0;m<(1<<n);m++)if(popc(m)>=req)subs.push(m);subs.sort((a,b)=>popc(a)-popc(b));
       for(const m of subs){const sel=[];for(let j=0;j<n;j++)if(m&(1<<j))sel.push(can[j]);const saved=sel.map(i=>({...st[i]}));
-        for(const i of sel){st[i].cnt++;st[i].last=d;st[i].sum+=values[d];}
+        for(const i of sel){st[i].cnt++;st[i].last=d;st[i].sum+=(cand[i].vals||values)[d];}
         if(dfs(d+1))return true;sel.forEach((i,j)=>{st[i]=saved[j];});}
       return false;}
     if(cand.length>COVERAGE.maxCandidates)return null;
@@ -115,16 +116,18 @@
     const P=problem;const N=P.dates.length;
     const D=DEFAULT_WEIGHTS,pw=P.weights||{};
     const opt={maxDays:P.maxDays??8,minGap:P.minGap??3,mode:P.mode||"strict",overW:pw.over??D.over,shortW:pw.short??D.short,dayW:pw.day??D.day};
-    const W={actual:pw.actual??D.actual,weekend:pw.weekend??D.weekend,avoid:pw.avoid??D.avoid,prefer:pw.prefer??D.prefer,balanceServis:pw.balanceServis??D.balanceServis,balanceAcil:pw.balanceAcil??D.balanceAcil,hard0:pw.hard??D.hard,switch:pw.switch??D.switch,posted:pw.posted??D.posted};
+    const W={actual:pw.actual??D.actual,weekend:pw.weekend??D.weekend,avoid:pw.avoid??D.avoid,prefer:pw.prefer??D.prefer,balanceServis:pw.balanceServis??D.balanceServis,balanceAcil:pw.balanceAcil??D.balanceAcil,hard0:pw.hard??D.hard,switch:pw.switch??D.switch,posted:pw.posted??D.posted,boundary:pw.boundary??D.boundary};
     const timeLimit=P.timeLimitMs??6000;
     const persons=P.persons.filter(p=>p.target>0&&p.cats.length);
-    const values={};for(const c of CATS)values[c]=P.fmsByDate.map(f=>f==null?null:f*P.factors[c]);
+    const values=valuesOf(P);
+    /* kişiye özel değer: NSİ'si izinli olduğu güne düşen gün +8 (3.4.0) */
+    const pvC=new Map();const pv=(p,c)=>{if(!p.bonusArr)return values[c];const k=p.pid+"|"+c;let v=pvC.get(k);if(!v){v=values[c].map((x,d)=>x==null?null:x+(p.bonusArr[d]||0)*P.factors[c]);pvC.set(k,v);}return v;};
     const proof=[];
     /* --- kanıtlı imkânsızlık ön kontrolleri --- */
     for(const p of persons){
-      const reach=p.cats.map(c=>({c,max:maxReachable(values[c],p.blockedArr,opt)}));
+      const reach=p.cats.map(c=>({c,max:maxReachable(pv(p,c),p.blockedArr,opt)}));
       const bestReach=Math.max(...reach.map(r=>r.max));
-      if(opt.mode!=="defer"&&bestReach+1e-9<p.target)proof.push({kind:"person",pid:p.pid,message:`${p.name}: hakediş ${p.target} eşdeğer saat; izin/engeller, en çok ${opt.maxDays} gün ve iki tam gün dinlenme kuralıyla ${p.cats.join("/")} kategorisinde en fazla ${bestReach} eşdeğer saat yazılabilir.`});
+      if(opt.mode!=="defer"&&reach.every(r=>r.max+1e-9<tgt(p,r.c)))proof.push({kind:"person",pid:p.pid,message:`${p.name}: hakediş ${p.target} eşdeğer saat${p.boundaryDebit?` (+ ay sınırı ${p.boundaryDebit} FMS: geçen ayın son günü nöbetinin ertesi günü bu aya düşer)`:""}; izin/engeller, en çok ${opt.maxDays} gün ve iki tam gün dinlenme kuralıyla ${p.cats.join("/")} kategorisinde en fazla ${bestReach} eşdeğer saat yazılabilir.`});
     }
     for(let d=0;d<N;d++)for(const c of CATS){
       const mn=P.daily[d]?.[c]?.min;if(!mn)continue;
@@ -135,7 +138,7 @@
     /* kapasite: yalnız Acil (veya yalnız Servis) kişilerinin en az gün ihtiyacı toplamı > o kategorinin günlük üst sınırları toplamı */
     for(const c of CATS){
       const only=persons.filter(p=>p.cats.length===1&&p.cats[0]===c);
-      let need=0,unknown=false;for(const p of only){const m=minDaysNeeded(values[c],p.blockedArr,p.target,opt);if(m==null){unknown=true;break;}need+=m;}
+      let need=0,unknown=false;for(const p of only){const m=minDaysNeeded(pv(p,c),p.blockedArr,tgt(p,c),opt);if(m==null){unknown=true;break;}need+=m;}
       if(unknown||opt.mode==="defer")continue;
       let capSum=0,hasCap=true;for(let d=0;d<N;d++){const mx=P.daily[d]?.[c]?.max;if(mx==null){hasCap=false;break;}capSum+=P.fmsByDate[d]==null?0:mx;}
       if(hasCap&&need>capSum)proof.push({kind:"capacity",cat:c,message:`${c}: yalnız ${c} kategorisine yazılabilen kişilerin hakedişi için en az ${need} kişi-gün gerekiyor; günlük üst sınırlar toplamı ${capSum}.`});
@@ -143,9 +146,9 @@
     /* kategori kapsama kanıtı: yalnız devirsiz modda ve başka kanıt yokken; sonuçsuz kalırsa hiçbir şey iddia edilmez */
     if(!proof.length&&opt.mode!=="defer"&&P.coverageProof!==false)for(const c of CATS){
       const need=P.dates.map((_,d)=>P.fmsByDate[d]==null?0:(P.daily[d]?.[c]?.min||0));if(!need.some(x=>x>0))continue;
-      const reachOf=p=>maxReachable(values[c],p.blockedArr,opt);
-      const cand=persons.filter(p=>p.cats.includes(c)&&reachOf(p)+1e-9>=p.target);
-      const r=coverageSearch(values[c],cand,need,opt,P.coverageMs??COVERAGE.ms,P.coverageNodes??COVERAGE.nodes);
+      const reachOf=p=>maxReachable(pv(p,c),p.blockedArr,opt);
+      const cand=persons.filter(p=>p.cats.includes(c)&&reachOf(p)+1e-9>=tgt(p,c));
+      const r=coverageSearch(values[c],cand.map(p=>({...p,target:tgt(p,c),vals:pv(p,c)})),need,opt,P.coverageMs??COVERAGE.ms,P.coverageNodes??COVERAGE.nodes);
       if(r===false){const out=persons.filter(p=>p.cats.includes(c)&&!cand.includes(p)).map(p=>({p,mx:reachOf(p)})).sort((a,b)=>b.p.target-a.p.target);
         const days=need.filter(x=>x>0).length;
         proof.push({kind:"coverage",cat:c,candidates:cand.map(p=>p.pid),message:`${c}: asgari kadro isteyen ${days} günün hepsine ${c} nöbetçisi yazılamıyor (kesin arama). ${c}'e yazılabilecek kişiler — hakedişini ${c}'te tamamlayabilenler — yalnız ${cand.length} kişi: ${cand.map(p=>`${p.name} (hakediş ${p.target})`).join(", ")||"yok"}; bunlar en çok ${opt.maxDays} gün ve iki tam gün dinlenme kuralıyla bu günleri kapsayamıyor.${out.length?` Diğer ${c} yetkili kişilerin hakedişi ${c}'te tamamlanamıyor: ${out.slice(0,6).map(x=>`${x.p.name} (hakediş ${x.p.target}, ${c}'te en çok ${x.mx})`).join(", ")}${out.length>6?` ve ${out.length-6} kişi daha`:""}.`:""} Seçenekler: bazı günler için ${c} asgari değerini değiştirmek (Adım 3 → Belirli günler için farklı sınır), onaylı devir modu ya da kurum kararı.`});}
@@ -165,11 +168,13 @@
       if(p.avoid?.has(d))x+=W.avoid;if(p.prefer?.has(d))x-=W.prefer;
       if(p.posted?.[c]?.has(d))x-=W.posted;
       if(P.weekend&&P.weekend[d])x+=W.weekend;
+      /* 3.4.0 ay sınırı: son günün +8 eki bu ayı ucuzlatır ama sonraki ayda aynı kişiye 8 borç doğurur — çözücü son günü bu ek yüzünden seçmesin (ek, fazla ödeme cezasıyla dengelenir); kadro gerektirdiğinde yazılırsa ek hesaba katılır */
+      if(P.bonusByDate&&P.bonusByDate[d])x+=opt.overW*P.bonusByDate[d]*P.factors[c]+W.boundary;
       return x;
     }
     const sched=new Map();
     function apply(p,s,sign){if(!s)return;for(const d of s.days)load[s.cat][d]+=sign;}
-    function best(p){let b=null;for(const c of p.cats){const cost=new Array(N);for(let d=0;d<N;d++)cost[d]=personDayCost(p,c,d);const r=bestSchedule(values[c],cost,p.target,opt);if(!r)continue;const cur=sched.get(p.pid);const sw=cur&&cur.cat!==c?W.switch:0;const tot=r.cost+sw;if(!b||tot<b.cost-1e-9)b={...r,cost:tot,cat:c};}return b;}
+    function best(p){let b=null;for(const c of p.cats){const cost=new Array(N);for(let d=0;d<N;d++)cost[d]=personDayCost(p,c,d);const r=bestSchedule(pv(p,c),cost,tgt(p,c),opt);if(!r)continue;const cur=sched.get(p.pid);const sw=cur&&cur.cat!==c?W.switch:0;const tot=r.cost+sw;if(!b||tot<b.cost-1e-9)b={...r,cost:tot,cat:c};}return b;}
     const rand=rng(P.seed||12345);
     const order=[...persons].sort((a,b)=>(a.cats.length-b.cats.length)||(b.target-a.target));
     let bestSol=null,sweeps=0,restarts=0;
@@ -200,16 +205,20 @@
     }
     const elapsedMs=Math.round(now()-t0);
     if(!bestSol)return{status:"not_found",proof:[],assignments:[],stats:{elapsedMs,sweeps,restarts}};
-    const assignments=[];for(const p of persons){const s=bestSol.sched.get(p.pid);if(!s)continue;for(const d of s.days)assignments.push({pid:p.pid,date:P.dates[d],category:s.cat,fms:P.fmsByDate[d],eq:values[s.cat][d]});}
+    const assignments=[];for(const p of persons){const s=bestSol.sched.get(p.pid);if(!s)continue;for(const d of s.days)assignments.push({pid:p.pid,date:P.dates[d],category:s.cat,fms:P.fmsByDate[d],eq:P.fmsByDate[d]*P.factors[s.cat]});/* görev değeri tablo; ay sınırı eki yalnız amaçta */}
     const perPerson=persons.map(p=>{const s=bestSol.sched.get(p.pid);return{pid:p.pid,category:s?s.cat:null,total:s?s.total:0,target:p.target,over:s?s.over:0,shortfall:s?s.shortfall:p.target,days:s?s.days.length:0};});
     return{status:bestSol.vio===0?"feasible":"not_found",residual:bestSol.vioList.map(x=>({date:P.dates[x.d],cat:x.c,type:x.type,by:x.by})),assignments,perPerson,proof:[],stats:{elapsedMs,sweeps,restarts,objective:Math.round(bestSol.obj*100)/100,balance:Math.round(bestSol.bal*100)/100,persons:persons.length,timeLimitMs:timeLimit}};
   }
+  /* 3.4.0 ay sınırı: günün değeri = FMS + ek (son gün, ertesi gün sonraki ayın iş günüyse +8 — PROBEL'in aylık hesabı) */
+  function valuesOf(P){const v={};for(const c of CATS)v[c]=P.fmsByDate.map((f,d)=>f==null?null:(f+((P.bonusByDate&&P.bonusByDate[d])||0))*P.factors[c]);return v;}
+  /* kişinin o kategorideki hedefi: geçen ayın son günü resmî nöbetinin ertesi günü bu aya düşüyorsa 8 FMS × kategori katsayısı eklenir */
+  function tgt(p,c){return p.targetByCat&&p.targetByCat[c]!=null?p.targetByCat[c]:p.target;}
   const r2=x=>Math.round(x*100)/100;
   /* Kişi bazlı alt sınır (devirsiz mod): her kişinin izin verilen kategorilerindeki en küçük kaçınılmaz fazlası. */
   function overLowerBound(problem){
-    const opt={maxDays:problem.maxDays??8,minGap:problem.minGap??3};const values={};for(const c of CATS)values[c]=problem.fmsByDate.map(f=>f==null?null:f*problem.factors[c]);
+    const opt={maxDays:problem.maxDays??8,minGap:problem.minGap??3};const values=valuesOf(problem);
     const per={};let lb=0;
-    for(const p of problem.persons){if(!(p.target>0)||!p.cats.length)continue;const by={};for(const c of p.cats)by[c]=overFloor(values[c],p.blockedArr,p.target,opt);const fin=Object.values(by).filter(v=>v!=null);per[p.pid]=by;if(fin.length)lb+=Math.min(...fin);}
+    for(const p of problem.persons){if(!(p.target>0)||!p.cats.length)continue;const by={};for(const c of p.cats)by[c]=overFloor(p.bonusArr?values[c].map((x,d)=>x==null?null:x+(p.bonusArr[d]||0)*problem.factors[c]):values[c],p.blockedArr,tgt(p,c),opt);const fin=Object.values(by).filter(v=>v!=null);per[p.pid]=by;if(fin.length)lb+=Math.min(...fin);}
     return{lb:r2(lb),per};
   }
   /* KATEGORİ İYİLEŞTİRME (3.2.1 — kullanıcı isteği 14.10.2026: “tüm olası varyasyonlar denenmeli”). Karma (iki kategoride de çalışmış) kişiler için:

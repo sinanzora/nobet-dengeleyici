@@ -18,6 +18,11 @@
     if(h)return h.confirmed&&C.num(h.fms)!=null?C.num(h.fms):null;
     return tab(db,String(wd));
   }
+  /* AY SINIRI (3.4.0) — motordan bağımsız: PROBEL'in aylık FMS'i. Son gün nöbeti (ertesi gün sonraki ayın iş günü) +8; geçen ayın son günü
+     resmî nöbeti (bu ayın 1'i iş günü, kişi o gün izinli değil) −8. Tatil cevabı girilmemiş ayda sabit tarihli tatiller esas alınır. */
+  const FIXED_HOL=["01-01","04-23","05-01","05-19","07-15","08-30","10-29"];
+  function workday(db,date){const wd=dow(date);if(wd===0||wd===6)return false;const P=db.months?.[date.slice(0,7)];
+    if(P&&P.settings?.specialDays?.holiday!=null){const h=(P.settings.holidays||[]).find(x=>x.date===date);return!(h&&h.kind!=="yarım gün");}return!FIXED_HOL.includes(date.slice(5));}
   /* saatli görevin türü (motordan bağımsız): gece = gece yarısını geçer; gündüz = 08–09 arası başlar, 16–17 arası biter */
   function hm(x){const m=/^(\d\d):(\d\d)$/.exec(x||"");return m?+m[1]*60+ +m[2]:null;}
   function shiftKind(s){const a=hm(s.start),b=hm(s.end);if(a==null||b==null)return"other";if(b<=a)return"night";if(a>=480&&a<=540&&b>=960&&b<=1020)return"day";return"other";}
@@ -110,6 +115,10 @@
     /* sonraki ayın mevcut resmî kaydı (varsa): ilk iki günündeki nöbetler bu ayın son günlerini kapatır */
     for(const n of(opts.nextFirstDuties||[])){for(let k=1;k<=2;k++){const back=C.addDays(n.date,-k);if(back.startsWith(month))(bnd.get(n.pid)||bnd.set(n.pid,[]).get(n.pid)).push({date:back,why:`sonraki ay ${C.fmtDate(n.date)} resmî ${n.cat} nöbeti`});}}
     /* --- görev bazlı kesin kurallar --- */
+    const mFirst=dates[0],mLast=dates[dates.length-1],pLast=C.monthDates(C.prevMonth(month)).slice(-1)[0];
+    const lastPlus=workday(db,C.addDays(mLast,1))?8:0,firstMinus=workday(db,mFirst)?8:0;const priorLastSet=new Set();
+    for(const cat of["Servis","Acil"])for(const p of(M.priorOfficial?.[cat]?.persons||[]))if((p.duties||[]).some(d=>d.date===pLast))priorLastSet.add(pidOf(db,p.name));
+    for(const x of M.priorManual||[])if(x.kind==="duty"&&x.date===pLast)priorLastSet.add(x.pid);
     const byPerson=new Map();const pd=new Set();
     const day={};dates.forEach(d=>day[d]={Servis:new Set(),Acil:new Set(),tasks:{Servis:0,Acil:0}});
     const fac=db.global.factors||{Servis:1,Acil:1.5};
@@ -146,7 +155,11 @@
         if(hist.length===0&&auth!==c)out.push(issue("error","CATEGORY_AUTH",`${nm}: fiilî kaynakta sayılan nöbet yok; ${c} Adım 2'de kategori seçilmemiş.`));
       }
       if(!e||!(e.target>0))out.push(issue("error","UNWORKED",`${nm}: bu ay fiilî hakedişi yok/0; resmî nöbet yazılması çalışılmamış nöbeti ücretli göstermek olur.`));
-      const official=arr.reduce((z,a)=>z+(fmsOfDate(db,M,a.date)||0)*(fac[a.cat]||0),0);
+      const off=d=>(M.leaves||[]).some(l=>l.pid===pid&&d>=l.start&&d<=l.end)||(()=>{const q=M.staff?.[pid]||{};return!!((q.startDate&&d<q.startDate)||(q.endDate&&d>q.endDate));})();
+      const bPlus=lastPlus&&arr.some(a=>a.date===mLast)?lastPlus:0;const bMinus=firstMinus&&priorLastSet.has(pid)&&!off(mFirst)?firstMinus:0;
+      /* NSİ kişinin çalışmadığı iş gününe düşerse PROBEL o günü gereken saatten saymaz: +8 */
+      const bLeave=8*C.uniq(arr.map(a=>a.date)).filter(d=>d<mLast&&!off(d)&&workday(db,C.addDays(d,1))&&off(C.addDays(d,1))).length;
+      const official=arr.reduce((z,a)=>z+(fmsOfDate(db,M,a.date)||0)*(fac[a.cat]||0),0)+(bPlus-bMinus+bLeave)*(fac[cats[0]]||0);/* PROBEL'in aylık FMS'i */
       if(e&&e.target!=null){
         const settle=M.staff?.[pid]?.settlePrior?openOf(M,pid):0;
         const need=e.target+settle;const short=C.round2(need-official);

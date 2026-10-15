@@ -2,7 +2,7 @@
    Tüm tarih hesapları YYYY-AA-GG metinleri ve UTC üzerinden yapılır; yerel saat dilimi kayması olmaz. */
 (function(root,factory){const api=factory();if(typeof module==="object"&&module.exports)module.exports=api;root.NobetCore=api;})(typeof globalThis!=="undefined"?globalThis:this,function(){
   "use strict";
-  const VERSION="3.3.3";
+  const VERSION="3.4.0";
   const UNITS=["Servis","Acil","Yoğun Bakım","Yenidoğan","Kıdemli"];
   const CATEGORY_OF_UNIT={"Servis":"Servis","Acil":"Acil","Yoğun Bakım":"Acil","Yenidoğan":"Acil","Kıdemli":"Acil"};
   const MONTHS_TR=["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
@@ -146,7 +146,9 @@
   function clone(o){return o==null?o:JSON.parse(JSON.stringify(o));}
   function uniq(arr){return[...new Set(arr)];}
 
-  return{VERSION,UNITS,CATEGORY_OF_UNIT,MONTHS_TR,DAYS_TR,DEFAULT_FMS_TABLE,fold,cleanSpaces,displayName,personKey,personIdOf,levenshtein,nameSimilarity,
+  /* Sabit tarihli resmî tatiller (ay-gün). Yalnız tatil sorusu henüz cevaplanmamış bir ayın iş günü tahmininde kullanılır (ay sınırı, 3.4.0); dinî bayramlar yok. */
+  const FIXED_HOLIDAYS=Object.freeze(["01-01","04-23","05-01","05-19","07-15","08-30","10-29"]);
+  return{VERSION,FIXED_HOLIDAYS,UNITS,CATEGORY_OF_UNIT,MONTHS_TR,DAYS_TR,DEFAULT_FMS_TABLE,fold,cleanSpaces,displayName,personKey,personIdOf,levenshtein,nameSimilarity,
     ymd,isYmd,validYmd,addDays,dateDiff,weekday,dayName,dayShort,daysInMonth,monthDates,priorBoundaryDays,prevMonth,nextMonth,monthLabel,fmtDate,monthFromName,excelSerialToYmd,parseDateValue,
     standardFms,tableFms,isDaytimeShift,isNightShift,num,round2,fmtNum,sha256Hex,sha256Text,colLetter,a1,parseA1,uid,clone,uniq,trLower,trUpper};
 });

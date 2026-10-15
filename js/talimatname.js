@@ -52,7 +52,8 @@
       ["Arefe hafta sonuna denk gelirse","o günün normal değeri (mesai yok)"],
       ["Tek başına gündüz mesaisi (08:00–09:00 arası başlar, 16:00–17:00 arası biter; ör. 08–16, 09–17) Cumartesi, Pazar ve resmî tatilde",`<b>${num(rule(g,"daytime"))}</b> (Acil ailesinde × 1,5 eşdeğer)`],
       ["Tek başına gece görevi (gece yarısını geçen, ör. 17–08)","olmaz — uyarı; düzeltilene ya da FMS elle girilene kadar sayılmaz"],
-      ["İki yerde çalışma","yalnız Cumartesi/Pazar ve Acil ailesi içinde: o günün tam Acil nöbeti. Hafta içi (tatil dahil) ya da Servis + Acil karışık gün → uyarı, sayılmaz"]])}
+      ["İki yerde çalışma","yalnız Cumartesi/Pazar ve Acil ailesi içinde: o günün tam Acil nöbeti. Hafta içi (tatil dahil) ya da Servis + Acil karışık gün → uyarı, sayılmaz"],
+      ["Ay sınırı — PROBEL'in aylık FMS'i (3.4.0, kullanıcı 15.10.2026)","Hakediş fiilî listeden tabloyla; resmî karşılık PROBEL'in bu ay göstereceği sayı: ayın son günü nöbeti, ertesi gün sonraki ayın iş günüyse <b>+8</b> (Pzt–Prş 16, Pazar 24); geçen ayın son günü resmî nöbetinin ertesi günü bu ayın iş gününe düşüyorsa (kişi izinli değilse) <b>−8</b>"]])}
     <p class="small">Resmî tatilde FMS, o ay kullanıcının girip onayladığı değerdir (bkz. bölüm 2). Yarım gün (arefe) için değer sorulmaz.</p>
 
     <h2>2. Her ay kullanıcıya sorulan / girilen değerler</h2>

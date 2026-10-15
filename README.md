@@ -1,4 +1,4 @@
-# Nöbet Dengeleyici 3.3.3
+# Nöbet Dengeleyici 3.4.0
 
 Tarayıcıda çalışan nöbet çizelgesi ve hakediş mutabakatı aracı.
 

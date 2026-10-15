@@ -172,6 +172,34 @@
     M.priorHolidays={answer:answer==null?null:!!answer,dates:answer?[...new Set(dates||[])].sort():[]};log(M,"ONCEKI_AY_TATIL",`${answer} ${M.priorHolidays.dates.join(",")}`);return M;}
   function fmsConfig(db,M){return{fmsTable:db.global.fmsTable,holidays:(M.settings.holidays||[]).map(h=>({date:h.date,kind:h.kind,fms:h.confirmed?h.fms:null}))};}
   function stdFms(db,M,date){return C.standardFms(date,fmsConfig(db,M));}
+  /* AY SINIRI — PROBEL'in aylık FMS'i (3.4.0; kullanıcı 15.10.2026, Ağustos/Eylül 2026 PROBEL verisiyle doğrulandı).
+     PROBEL her ayın FMS'ini o ayın içinde hesaplar (çalışılan − gereken saat). Ayın son günü tutulan nöbetin ertesi günü (NSİ) sonraki aya düşer:
+     ertesi gün iş günüyse nöbet bu aya 8 FMS fazla yazılır (Pzt–Prş 16, Pazar 24), sonraki ayda o kişiden 8 düşer. Kurum hakedişi fiilî listeden
+     tabloyla (8/16/24/16) hesaplar ve PROBEL'in AYLIK FMS'ini buna eşitler (Ağustos 2026: 31.08 resmî nöbetli 4 kişide PROBEL = fiilî hakediş).
+     Bu yüzden resmî karşılık = tablo toplamı + 8 (son gün nöbeti; sonraki ayın 1'i iş günü) − 8 (geçen ayın son günü resmî nöbeti; bu ayın 1'i iş günü,
+     kişi o gün izinli değil). Görevlerin FMS'i tablo değeri kalır (PROBEL etiketi ve denetçinin gün kontrolü değişmez). */
+  const BOUNDARY_FMS=8;
+  function isWorkday(db,date){const w=C.weekday(date);if(w===0||w===6)return false;const P=db.months&&db.months[date.slice(0,7)];
+    if(P&&P.settings&&P.settings.specialDays&&P.settings.specialDays.holiday!=null){const h=(P.settings.holidays||[]).find(x=>x.date===date);return!(h&&h.kind!==HALF);}
+    return!C.FIXED_HOLIDAYS.includes(date.slice(5));}
+  function boundaryInfo(db,M){const dates=C.monthDates(M.month);const first=dates[0],last=dates[dates.length-1];const prevLast=C.monthDates(C.prevMonth(M.month)).slice(-1)[0];const next1=C.addDays(last,1);
+    const prior=new Map();for(const c of["Servis","Acil"]){const src=M.priorOfficial&&M.priorOfficial[c];if(!src)continue;for(const p of src.persons||[])if((p.duties||[]).some(d=>d.date===prevLast))prior.set(resolve(db,p.name),c);}
+    for(const x of M.priorManual||[])if(x.kind==="duty"&&x.date===prevLast&&!prior.has(x.pid))prior.set(x.pid,"elle");
+    return{first,last,prevLast,next1,firstWork:isWorkday(db,first),lastBonus:isWorkday(db,next1)?BOUNDARY_FMS:0,prior};}
+  function leaveOnDay(M,pid,date){return(M.leaves||[]).some(l=>l.pid===pid&&date>=l.start&&date<=l.end);}
+  /* kişi o gün çalışmak zorunda değil: izin (yıllık, rapor, ayrıldı…) ya da başlama öncesi / bitiş sonrası */
+  function notRequired(M,pid,date){if(leaveOnDay(M,pid,date))return true;const st=(M.staff&&M.staff[pid])||{};return!!((st.startDate&&date<st.startDate)||(st.endDate&&date>st.endDate));}
+  /* NSİ kişinin zaten çalışmadığı bir iş gününe düşerse PROBEL o günü gereken saatten saymaz: nöbet 8 FMS fazla yazılır
+     (kanıt: kullanıcının Ağustos ve Eylül 2026 PROBEL ekranları — Pazar nöbeti → ertesi gün yıllık izin başı; Perşembe nöbeti → ertesi gün ayrılış) */
+  function leaveNsiDates(db,M,pid){const dates=C.monthDates(M.month);const out=new Set();for(let i=0;i<dates.length-1;i++){const n=dates[i+1];if(isWorkday(db,n)&&notRequired(M,pid,n)&&!notRequired(M,pid,dates[i]))out.add(dates[i]);}return out;}
+  function boundaryAdj(db,M,pid,assignments,bi){bi=bi||boundaryInfo(db,M);const mine=(assignments||[]).filter(a=>a.pid===pid);
+    const plus=bi.lastBonus&&mine.some(a=>a.date===bi.last)?bi.lastBonus:0;const minus=bi.firstWork&&bi.prior.has(pid)&&!notRequired(M,pid,bi.first)?BOUNDARY_FMS:0;
+    const ln=leaveNsiDates(db,M,pid);const ld=mine.filter(a=>ln.has(a.date)).map(a=>a.date);const leave=ld.length*BOUNDARY_FMS;
+    const t=[];if(plus)t.push(`${C.fmtDate(bi.last)} nöbetinin ertesi günü (${C.fmtDate(bi.next1)}) sonraki aya düşer: +${plus}`);if(minus)t.push(`${C.fmtDate(bi.prevLast)} resmî nöbetinin ertesi günü (${C.fmtDate(bi.first)}) bu aya düşer: −${minus}`);if(leave)t.push(`${ld.map(d=>C.fmtDate(d)).join(", ")} nöbetinin ertesi günü izinli/ayrılmış olduğu güne düşer: +${leave}`);
+    return{plus,minus,leave,fms:plus-minus+leave,text:t.join("; ")};}
+  /* resmî karşılık = PROBEL'in bu ay göstereceği FMS × kategori katsayısı (eşdeğer saat) */
+  function officialEqOf(db,M,pid,assignments,bi){const mine=(assignments||[]).filter(a=>a.pid===pid);if(!mine.length)return 0;const adj=boundaryAdj(db,M,pid,assignments,bi);
+    return C.round2(mine.reduce((z,a)=>z+(a.eq||0),0)+adj.fms*(db.global.factors[mine[0].category]||0));}
   /* Fiilî kaydın bu aya ait geçerli tarihi var mı — TEK tanım: hakediş satırları (actualRows), ay dışı/geçersiz tarihli aktif kayıtlar
      (misplacedActual: ön koşul hatası, kayıt listesi, rapor) aynı kuralla ayrılır (FABLE tur12c T12c-1/T12c-4). Denetçi aynı kuralı bağımsız uygular. */
   function inMonthDate(M,d){return C.isYmd(d)&&d.startsWith(M.month);}
@@ -357,9 +385,9 @@
     return out;
   }
   /* Kişi bazlı fazla ödeme alt sınırı (yalnız devirsiz mod): toplam fazla ≥ alt sınır her zaman; eşitse olası en düşük değer KANITLIDIR */
-  function overBound(built,assignments,M){
-    if(M.settings.mode==="defer")return null;const P=built.problem;const lb=S.overLowerBound(P).lb;let total=0;
-    for(const p of P.persons){if(!(p.target>0))continue;const eq=(assignments||[]).filter(a=>a.pid===p.pid).reduce((z,a)=>z+(a.eq||0),0);total+=Math.max(0,eq-p.target);}
+  function overBound(db,built,assignments,M){
+    if(M.settings.mode==="defer")return null;const P=built.problem;const lb=S.overLowerBound(P).lb;let total=0;const bi=boundaryInfo(db,M);
+    for(const p of P.persons){if(!(p.target>0))continue;const eq=officialEqOf(db,M,p.pid,assignments,bi);total+=Math.max(0,eq-p.target);}
     total=C.round2(total);return{total,lowerBound:lb,atBound:total<=lb+1e-9};
   }
   function postNotes(db,M,built,assignments,sol){
@@ -368,7 +396,9 @@
     const flags=newStarterFlags(db,M,built.staff);
     for(const[pid,f]of flags){const early=assignments.filter(a=>a.pid===pid&&a.date<f.first).map(a=>C.fmtDate(a.date).slice(0,5));if(early.length)out.push({level:"warning",code:"OFFICIAL_BEFORE_FIRST_ACTUAL",message:`${personName(db,pid)}: resmî öneri ${early.join(", ")} günlerine nöbet yazdı; bu günler ilk fiilî kaydından (${C.fmtDate(f.first)}) önce. Kişi o tarihte henüz başlamadıysa Adım 2'de “Henüz başlamadı” izni girip yeniden hesaplayın.`,pid});}
     out.push(...staffingNotes(db,M,assignments,built.rows));
-    const ob=overBound(built,assignments,M);
+    {const bi=boundaryInfo(db,M);const ls=C.uniq(assignments.map(a=>a.pid)).map(pid=>({pid,adj:boundaryAdj(db,M,pid,assignments,bi)})).filter(x=>x.adj.fms);
+     if(ls.length)out.push({level:"info",code:"BOUNDARY_FMS",message:`Ay sınırı (PROBEL'in aylık FMS'i, resmî karşılığa katıldı): ${ls.map(x=>`${personName(db,x.pid)} ${x.adj.fms>0?"+":"−"}${Math.abs(x.adj.fms)}`).join(", ")}. PROBEL ayın son günü nöbetinin ertesi gününü (NSİ) sonraki aya yazar; kurum PROBEL'in aylık sayısını tabloyla hesaplanan hakedişe eşitlediği için program da öyle hesaplar.`});}
+    const ob=overBound(db,built,assignments,M);
     if(ob)out.push({level:"info",code:"OVERPAY_BOUND",message:`Fazla ödeme (plan) ${C.fmtNum(ob.total)} eşdeğer saat; kişi bazlı kaçınılmaz alt sınır ${C.fmtNum(ob.lowerBound)} (her kişinin hakedişi günlük FMS adımlarıyla karşılanabildiği için). ${ob.atBound?"Bu çizelge olası en düşük fazla ödemeye ulaştı (kanıtlı).":`Aradaki ${C.fmtNum(C.round2(ob.total-ob.lowerBound))} saatin günlük kadro/aralık kuralları nedeniyle kaçınılmaz olup olmadığı kanıtlanamadı.`}`});
     const fx=sol&&sol.stats&&sol.stats.categoryFixed||[];
     if(fx.length)out.push({level:"info",code:"CATEGORY_IMPROVED",message:`Kategori iyileştirmesi: ${fx.map(x=>`${x.name} → ${x.category}`).join(", ")} (fazla ödeme ${C.fmtNum(sol.stats.overFirst)} → ${C.fmtNum(sol.stats.overTotal)} eşdeğer saat). İki bölümde de çalışmış kişiler için kategori seçimi Adım 2'den değiştirilebilir.`});
@@ -443,7 +473,7 @@
   /* ---------------- problem kurma + çözüm ---------------- */
   function buildProblem(db,M,opts={}){
     const rows=actualRows(db,M);const staff=staffSummary(db,M,rows);const bnd=boundaryBlocks(db,M,staff);
-    const dates=C.monthDates(M.month);const fmsByDate=dates.map(d=>stdFms(db,M,d));
+    const dates=C.monthDates(M.month);const fmsByDate=dates.map(d=>stdFms(db,M,d));const bi=boundaryInfo(db,M);
     const persons=[];const blockedMap={};
     for(const s of staff){
       if(s.excluded||!(s.earnedTarget>0)||!s.allowed.length)continue;
@@ -453,10 +483,12 @@
       s.rows.forEach(r=>{const i=dates.indexOf(r.date);if(i>=0){ad[r.category]?.add(i);any.add(i);}});
       const {avoid,prefer}=softPrefs(M,s.pid);
       const posted=postedDays(db,M,s.pid,dates);
-      persons.push({pid:s.pid,name:s.name,target:C.round2(s.earnedTarget+settle),settle,cats:s.allowed,blockedArr:dates.map(d=>blocks.has(d)),actualDates:ad,actualDatesAny:any,avoid,prefer,posted});
+      /* ay sınırı borcu: geçen ayın son günü resmî nöbetinin NSİ'si bu ayın iş gününe düşer → PROBEL bu ay 8 FMS az gösterir; hedef kategoriye göre artar */
+      const debit=bi.firstWork&&bi.prior.has(s.pid)&&!notRequired(M,s.pid,bi.first)?BOUNDARY_FMS:0;const target=C.round2(s.earnedTarget+settle);const lnd=leaveNsiDates(db,M,s.pid);
+      persons.push({pid:s.pid,name:s.name,target,boundaryDebit:debit,bonusArr:lnd.size?dates.map(d=>lnd.has(d)?BOUNDARY_FMS:0):undefined,targetByCat:debit?Object.fromEntries(s.allowed.map(c=>[c,C.round2(target+debit*db.global.factors[c])])):undefined,settle,cats:s.allowed,blockedArr:dates.map(d=>blocks.has(d)),actualDates:ad,actualDatesAny:any,avoid,prefer,posted});
     }
     const daily=dailyLimits(M).map(x=>({Servis:x.Servis,Acil:x.Acil}));
-    return{rows,staff,bnd,blockedMap,problem:{dates,fmsByDate,factors:db.global.factors,maxDays:db.global.maxDutyDays,minGap:db.global.minGapDays,mode:M.settings.mode,daily,persons,weekend:dates.map(d=>[0,6].includes(C.weekday(d))),timeLimitMs:(opts.timeLimitSec??db.global.timeLimitSec??8)*1000,seed:opts.seed||20260913,weights:opts.weights||db.global.solverWeights||undefined}};
+    return{rows,staff,bnd,blockedMap,boundary:bi,problem:{dates,fmsByDate,bonusByDate:dates.map(d=>d===bi.last?bi.lastBonus:0),factors:db.global.factors,maxDays:db.global.maxDutyDays,minGap:db.global.minGapDays,mode:M.settings.mode,daily,persons,weekend:dates.map(d=>[0,6].includes(C.weekday(d))),timeLimitMs:(opts.timeLimitSec??db.global.timeLimitSec??8)*1000,seed:opts.seed||20260913,weights:opts.weights||db.global.solverWeights||undefined}};
   }
   function run(db,month,opts={}){
     const M=db.months[month];if(!M)throw new Error("Ay bulunamadı.");
@@ -535,10 +567,12 @@
     return found;
   }
   function reconcile(db,M,result){
-    const staff=staffSummary(db,M);const a=result?.assignments||[];
+    const staff=staffSummary(db,M);const a=result?.assignments||[];const bi=boundaryInfo(db,M);
     return staff.filter(s=>s.rows.length||s.openBalance||a.some(x=>x.pid===s.pid)).map(s=>{
       const mine=a.filter(x=>x.pid===s.pid);const cats=C.uniq(mine.map(x=>x.category));
-      const plannedFms=mine.reduce((z,x)=>z+(x.fms||0),0),plannedEq=C.round2(mine.reduce((z,x)=>z+(x.eq||0),0));
+      const adj=mine.length?boundaryAdj(db,M,s.pid,a,bi):{fms:0,text:""};const fct=cats.length===1?(db.global.factors[cats[0]]||0):0;
+      /* 3.4.0: resmî FMS/eşdeğer = PROBEL'in bu ay göstereceği sayı (ay sınırı dahil) */
+      const plannedFms=mine.reduce((z,x)=>z+(x.fms||0),0)+adj.fms,plannedEq=C.round2(mine.reduce((z,x)=>z+(x.eq||0),0)+adj.fms*fct);
       const posted=postedOfficial(db,M,s.pid);
       const basis=posted&&!posted.unknown?"PROBEL (yüklendi)":"plan (PROBEL teyidi yok)";
       const officialEq=posted&&!posted.unknown?C.round2(posted.eq):plannedEq;
@@ -551,7 +585,7 @@
         else decision="mutabakat bekliyor (ödeme durumu/onay eksik)";
       }else if(diff!=null&&diff<-0.001)decision="fazla ödeme planı (fark negatif)";
       return{pid:s.pid,name:s.name,excluded:s.excluded,actualDays:s.actualDays,servisFms:s.servisFms,acilFms:s.acilFms,earnedComputed:s.earnedComputed,earnedOverride:s.earnedOverride,earnedTarget:s.earnedTarget,
-        plannedCategory:cats.join(" + ")||"—",plannedDays:C.uniq(mine.map(x=>x.date)).length,plannedFms,plannedEq,
+        plannedCategory:cats.join(" + ")||"—",plannedDays:C.uniq(mine.map(x=>x.date)).length,plannedFms,plannedEq,boundaryFms:adj.fms,boundaryText:adj.text,
         postedCategory:posted?posted.categories.join(" + "):"",postedFms:posted?posted.fms:null,postedEq:posted&&!posted.unknown?C.round2(posted.eq):null,basis,difference:diff,openingOpen:s.openBalance,decision,carry,closingOpen:C.round2(s.openBalance+carry)};
     });
   }
@@ -775,7 +809,7 @@
     db.activeMonth=old.activeMonth||Object.keys(db.months)[0]||null;return db;
   }
 
-  return{DB_VERSION,defaultGlobal,newDb,newMonth,ensureMonth,log,resolve,ensurePerson,personName,confirmAlias,rejectAlias,isRejected,aliasSuggestions,
+  return{DB_VERSION,BOUNDARY_FMS,isWorkday,boundaryInfo,boundaryAdj,officialEqOf,defaultGlobal,newDb,newMonth,ensureMonth,log,resolve,ensurePerson,personName,confirmAlias,rejectAlias,isRejected,aliasSuggestions,
     setActualImport,confirmActualImport,setProbel,probelSignature,actualRows,staffSummary,priorStatus,boundaryBlocks,personBlocks,dailyLimits,preflight,buildProblem,run,manualEdit,pendingManualEdits,reaudit,
     ledgerBalances,openBalance,addLedger,reconcile,postedOfficial,officialForMonth,pullPriorFromPrevious,priorSignature,inputSignature,monthInputSignature,checkStale,carryToNext,carryForwardBasics,nextMonthFirstDuties,stdFms,dayTypeOf,
     newStarterInfo,newStarterFlags,postedDiff,staffingNotes,overBound,INPUT_SIG_V,PRIOR_MANUAL_LABEL,inMonthDate,misplacedActual,recordListModel,LEGACY_ORIGINS,dropLegacyPrior,dropLegacyCurrent,validateDb,validateCarry,priorDayCounts,repairDb,okDate,MONTH_RE,
