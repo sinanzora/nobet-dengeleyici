@@ -1,4 +1,4 @@
-# Nöbet Dengeleyici 3.6.1
+# Nöbet Dengeleyici 3.6.2
 
 Tarayıcıda çalışan nöbet çizelgesi ve hakediş mutabakatı aracı.
 
